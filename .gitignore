@@ -1,0 +1,4 @@
+mini-app/node_modules/
+mini-app/.env
+*.zip
+dist/
