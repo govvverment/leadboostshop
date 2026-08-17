@@ -1,0 +1,45 @@
+name: Deploy Supabase Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase-functions/**"
+      - ".github/workflows/deploy-supabase-functions.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        working-directory: supabase-functions
+        run: supabase link --project-ref $SUPABASE_PROJECT_ID
+
+      - name: Deploy functions
+        working-directory: supabase-functions
+        run: |
+          supabase functions deploy auth --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy account --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy buy --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy deposit-create --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy deposit-check --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy admin-login --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy admin-products --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy admin-stats --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy admin-upload --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy bot-webhook --project-ref $SUPABASE_PROJECT_ID
