@@ -412,3 +412,33 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+[functions.auth]
+verify_jwt = false
+
+[functions.account]
+verify_jwt = false
+
+[functions.buy]
+verify_jwt = false
+
+[functions.deposit-create]
+verify_jwt = false
+
+[functions.deposit-check]
+verify_jwt = false
+
+[functions.bot-webhook]
+verify_jwt = false
+
+[functions.admin-login]
+verify_jwt = false
+
+[functions.admin-products]
+verify_jwt = false
+
+[functions.admin-stats]
+verify_jwt = false
+
+[functions.admin-upload]
+verify_jwt = false
