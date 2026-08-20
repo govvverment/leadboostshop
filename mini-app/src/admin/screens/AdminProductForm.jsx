@@ -41,6 +41,8 @@ export default function AdminProductForm() {
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [categories, setCategories] = useState(null);
+  const [inventoryFiles, setInventoryFiles] = useState([]);
+  const [inventoryText, setInventoryText] = useState('');
 
   useEffect(() => {
     adminApi
@@ -89,6 +91,23 @@ export default function AdminProductForm() {
     }
   };
 
+  const handleInventoryFiles = async (e) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (!files.length) return;
+
+    setError(null);
+    try {
+      const contents = await Promise.all(files.map((file) => file.text()));
+      setInventoryFiles(files.map((file) => file.name));
+      setInventoryText(contents.map((content) => content.trim()).filter(Boolean).join('\n'));
+    } catch {
+      setInventoryFiles([]);
+      setInventoryText('');
+      setError('Не удалось прочитать один из TXT-файлов');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -111,6 +130,7 @@ export default function AdminProductForm() {
       license: form.kind === 'one-time' ? form.license : null,
       period: form.kind === 'subscription' ? form.period : null,
       periodLabel: form.kind === 'subscription' ? form.periodLabel : null,
+      ...(!isEdit && inventoryText.trim() ? { inventoryText: inventoryText.trim() } : {}),
     };
 
     setSaving(true);
@@ -206,8 +226,30 @@ export default function AdminProductForm() {
               </>
             )}
             {!isEdit &&
-              ` Загрузить ${form.kind === 'account' ? 'аккаунты' : 'ссылки'} можно будет сразу после создания товара.`}
+              ` Данные из TXT-файлов можно загрузить ниже — они сразу попадут на склад.`}
           </div>
+        )}
+
+        {!isEdit && (
+          <Field label={form.kind === 'account' ? 'Данные аккаунтов (.txt)' : 'Данные ссылок (.txt)'}>
+            <label className="btn btn--secondary btn--block" style={{ textAlign: 'center' }}>
+              📄 Выбрать TXT-файлы
+              <input
+                type="file"
+                accept=".txt,text/plain"
+                multiple
+                onChange={handleInventoryFiles}
+                style={{ display: 'none' }}
+              />
+            </label>
+            <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
+              {inventoryFiles.length
+                ? `Выбрано файлов: ${inventoryFiles.length} (${inventoryFiles.join(', ')})`
+                : form.kind === 'account'
+                  ? 'Можно выбрать несколько файлов. Один аккаунт на строку: ссылка или логин:пароль[:доп. инфо].'
+                  : 'Можно выбрать несколько файлов. Одна ссылка на строку.'}
+            </span>
+          </Field>
         )}
 
         {form.kind === 'subscription' && (

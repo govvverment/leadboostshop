@@ -149,8 +149,8 @@ alter table admin_sessions enable row level security;
 -- Публичных политик нет — доступ только через Edge Functions.
 
 -- ------------------------------------------------------------
--- Склад — одна строка = один настоящий аккаунт (login/password) ИЛИ
--- одна ссылка на скачивание (link, для kind='one-time'/'subscription').
+-- Склад — одна строка = один настоящий аккаунт (login/password ИЛИ link)
+-- или одна ссылка на скачивание (link, для kind='one-time'/'subscription').
 -- Реальные данные НИКОГДА не читаются напрямую через anon-ключ, только
 -- через Edge Functions (service_role), и то — покупателю выдаётся
 -- ровно его строка, остальным доступа нет вообще.
@@ -393,9 +393,14 @@ begin
       set status = 'sold', purchase_id = v_purchase_id, sold_at = now()
       from picked
       where ai.id = picked.id
-      returning ai.login, ai.password, ai.extra
+      returning ai.login, ai.password, ai.extra, ai.link
     )
-    select jsonb_agg(jsonb_build_object('login', login, 'password', password, 'extra', extra))
+    select jsonb_agg(
+      case
+        when link is not null then jsonb_build_object('link', link)
+        else jsonb_build_object('login', login, 'password', password, 'extra', extra)
+      end
+    )
       into v_credentials
     from updated;
 

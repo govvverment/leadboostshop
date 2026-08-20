@@ -17,6 +17,33 @@ export default function PurchaseDetails() {
     showToast('Скопировано');
   };
 
+  // Все выданные данные одним .txt-файлом — удобно, когда куплено
+  // сразу много аккаунтов и копировать каждый по отдельности неудобно.
+  // Формат строк тот же, что и при загрузке склада в админке
+  // (login:password[:допинфо]), так и для ссылок.
+  const downloadAsFile = () => {
+    if (!purchase?.credentials?.length) return;
+    const lines = purchase.credentials.map((cred) =>
+      cred.link
+        ? cred.extra
+          ? `${cred.link}:${cred.extra}`
+          : cred.link
+        : cred.extra
+          ? `${cred.login}:${cred.password}:${cred.extra}`
+          : `${cred.login}:${cred.password}`
+    );
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const safeTitle = (purchase.title || 'purchase').replace(/[^\wа-яА-ЯёЁ -]/g, '').trim().replace(/\s+/g, '_');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeTitle || 'purchase'}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (!purchase) {
     return (
       <Screen title="Покупка">
@@ -100,51 +127,37 @@ export default function PurchaseDetails() {
         <h3 className="section__title">{isAccount ? 'Получить товар' : 'Ссылка на скачивание'}</h3>
 
         {purchase.credentials?.length ? (
-          <div className="list">
-            {purchase.credentials.map((cred, i) => (
-              <div className="detail-list" key={i} style={{ marginBottom: 10 }}>
-                {purchase.credentials.length > 1 && (
-                  <div className="detail-list__row">
-                    <span style={{ fontWeight: 700 }}>{isAccount ? `Аккаунт ${i + 1}` : `Файл ${i + 1}`}</span>
-                    <span />
-                  </div>
-                )}
-                {cred.link ? (
-                  <div className="detail-list__row">
-                    <span>Ссылка</span>
-                    <button
-                      className="detail-list__link mono"
-                      style={{ wordBreak: 'break-all', textAlign: 'right' }}
-                      onClick={() => copy(cred.link)}
-                    >
-                      {cred.link}
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="detail-list__row">
-                      <span>Логин</span>
-                      <button className="detail-list__link mono" onClick={() => copy(cred.login)}>
-                        {cred.login}
-                      </button>
-                    </div>
-                    <div className="detail-list__row">
-                      <span>Пароль</span>
-                      <button className="detail-list__link mono" onClick={() => copy(cred.password)}>
-                        {cred.password}
-                      </button>
-                    </div>
-                    {cred.extra && (
+          <>
+            <button className="btn btn--secondary btn--block" style={{ marginBottom: 12 }} onClick={downloadAsFile}>
+              📄 Скачать файлом
+            </button>
+            {!isAccount && (
+              <div className="list">
+                {purchase.credentials.map((cred, i) => (
+                  <div className="detail-list" key={i} style={{ marginBottom: 10 }}>
+                    {purchase.credentials.length > 1 && (
                       <div className="detail-list__row">
-                        <span>Доп. инфо</span>
-                        <span className="mono">{cred.extra}</span>
+                        <span style={{ fontWeight: 700 }}>{`Файл ${i + 1}`}</span>
+                        <span />
                       </div>
                     )}
-                  </>
-                )}
+                    {cred.link ? (
+                      <div className="detail-list__row">
+                        <span>Ссылка</span>
+                        <button
+                          className="detail-list__link mono"
+                          style={{ wordBreak: 'break-all', textAlign: 'right' }}
+                          onClick={() => copy(cred.link)}
+                        >
+                          {cred.link}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         ) : (
           <p className="hint-text">
             Данные {isAccount ? 'для входа' : 'для скачивания'} недоступны — обратитесь в поддержку, если покупка не

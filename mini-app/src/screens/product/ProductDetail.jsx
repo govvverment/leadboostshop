@@ -39,9 +39,8 @@ export default function ProductDetail() {
 
   const specs = isAccount
     ? [
-        ['GEO', `${product.geo} ${product.geoFlag}`],
+        ['GEO', product.geo],
         ['Тип', product.type],
-        ['Платформа', product.platform],
       ]
     : isSubscription
     ? [

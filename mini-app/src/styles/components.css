@@ -267,7 +267,7 @@
   border: 1px solid var(--border);
   color: var(--text-primary);
   padding: 10px 16px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-lg);
   font-size: 13px;
   font-weight: 500;
   display: flex;
@@ -795,6 +795,33 @@
   font-size: 13px;
   text-align: center;
   margin: -6px 0 4px;
+}
+
+.payment-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  margin: 0 0 16px;
+  border: 1px solid rgba(228, 84, 94, 0.42);
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.payment-alert__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(228, 84, 94, 0.16);
+  color: var(--danger);
+  font-weight: 800;
 }
 
 .result-screen {

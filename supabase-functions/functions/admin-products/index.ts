@@ -43,6 +43,66 @@ function validateProduct(body: Record<string, unknown>): string | null {
   return null;
 }
 
+function buildInventoryRows(productId: string, kind: string, text: string) {
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return { rows: [], error: 'Не найдено ни одной строки' };
+
+  const rows: Record<string, unknown>[] = [];
+  if (kind === 'one-time' || kind === 'subscription') {
+    for (const line of lines) {
+      // Разделитель доп. инфо ищем только после схемы URL,
+      // чтобы не принять двоеточие в https:// за разделитель.
+      const schemeMatch = line.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//);
+      const searchFrom = schemeMatch ? schemeMatch[0].length : 0;
+      const sepIndex = line.indexOf(':', searchFrom);
+      const link = sepIndex === -1 ? line : line.slice(0, sepIndex).trim();
+      const extra = sepIndex === -1 ? null : line.slice(sepIndex + 1).trim() || null;
+      rows.push({
+        id: crypto.randomUUID(),
+        product_id: productId,
+        link,
+        extra,
+        status: 'available',
+      });
+    }
+  } else {
+    for (const line of lines) {
+      // Для аккаунтов поддерживаем два формата в одном и том же TXT:
+      // login:password[:extra] или одна ссылка, представляющая один
+      // аккаунт. URL сохраняем целиком, не разбирая двоеточия внутри.
+      if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/\S+$/.test(line)) {
+        rows.push({
+          id: crypto.randomUUID(),
+          product_id: productId,
+          link: line,
+          status: 'available',
+        });
+        continue;
+      }
+
+      const parts = line.split(':');
+      if (parts.length < 2) {
+        return { rows: [], error: `Строка "${line}" — не похожа на ссылку или login:password` };
+      }
+      const [login, password, ...rest] = parts;
+      rows.push({
+        id: crypto.randomUUID(),
+        product_id: productId,
+        login: login.trim(),
+        password: password.trim(),
+        extra: rest.length ? rest.join(':').trim() : null,
+        status: 'available',
+      });
+    }
+  }
+
+  return { rows, error: null };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -84,6 +144,16 @@ Deno.serve(async (req) => {
       if (error) return withCors({ error }, 400);
 
       const id = body.id || `${body.category}-${crypto.randomUUID().slice(0, 8)}`;
+      let inventoryRows: Record<string, unknown>[] = [];
+
+      if (body.inventoryText !== undefined && body.inventoryText !== null && body.inventoryText !== '') {
+        if (typeof body.inventoryText !== 'string') {
+          return withCors({ error: 'Данные склада должны быть текстом' }, 400);
+        }
+        const parsed = buildInventoryRows(id, String(body.kind), body.inventoryText);
+        if (parsed.error) return withCors({ error: parsed.error }, 400);
+        inventoryRows = parsed.rows;
+      }
 
       const { error: dbError } = await supabase.from('products').insert({
         id,
@@ -104,8 +174,18 @@ Deno.serve(async (req) => {
       });
       if (dbError) return withCors({ error: dbError.message }, 500);
 
+      if (inventoryRows.length > 0) {
+        const { error: inventoryError } = await supabase.from('account_inventory').insert(inventoryRows);
+        if (inventoryError) {
+          // Не оставляем пустой товар, если его начальный склад
+          // не смог записаться.
+          await supabase.from('products').delete().eq('id', id);
+          return withCors({ error: inventoryError.message }, 500);
+        }
+      }
+
       const { data } = await supabase.from('products').select('*').eq('id', id).single();
-      return withCors(mapProduct(data), 201);
+      return withCors({ ...mapProduct(data), inventoryAdded: inventoryRows.length }, 201);
     }
 
     if (action === 'update') {
@@ -188,49 +268,9 @@ Deno.serve(async (req) => {
         .single();
       if (productError) return withCors({ error: productError.message }, 500);
 
-      const lines = body.text
-        .split('\n')
-        .map((l: string) => l.trim())
-        .filter(Boolean);
-
-      if (lines.length === 0) return withCors({ error: 'Не найдено ни одной строки' }, 400);
-
-      const rows = [];
-      if (product.kind === 'one-time' || product.kind === 'subscription') {
-        // Ссылка + необязательная доп.инфо после ":" — колонки в самом
-        // URL (https://...) не путаем со split(':'), ищем разделитель
-        // только ПОСЛЕ "схема://".
-        for (const line of lines) {
-          const schemeMatch = line.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//);
-          const searchFrom = schemeMatch ? schemeMatch[0].length : 0;
-          const sepIndex = line.indexOf(':', searchFrom);
-          const link = sepIndex === -1 ? line : line.slice(0, sepIndex).trim();
-          const extra = sepIndex === -1 ? null : line.slice(sepIndex + 1).trim() || null;
-          rows.push({
-            id: crypto.randomUUID(),
-            product_id: body.productId,
-            link,
-            extra,
-            status: 'available',
-          });
-        }
-      } else {
-        for (const line of lines) {
-          const parts = line.split(':');
-          if (parts.length < 2) {
-            return withCors({ error: `Строка "${line}" — не похожа на login:password` }, 400);
-          }
-          const [login, password, ...rest] = parts;
-          rows.push({
-            id: crypto.randomUUID(),
-            product_id: body.productId,
-            login: login.trim(),
-            password: password.trim(),
-            extra: rest.length ? rest.join(':').trim() : null,
-            status: 'available',
-          });
-        }
-      }
+      const parsed = buildInventoryRows(body.productId, product.kind, body.text);
+      if (parsed.error) return withCors({ error: parsed.error }, 400);
+      const rows = parsed.rows;
 
       const { error } = await supabase.from('account_inventory').insert(rows);
       if (error) return withCors({ error: error.message }, 500);

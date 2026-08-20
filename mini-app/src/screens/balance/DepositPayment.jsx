@@ -125,7 +125,12 @@ export default function DepositPayment() {
         <h1 className="page-head__title">Оплата</h1>
       </div>
 
-      {error && <p className="confirm-sheet__warning">{error}</p>}
+      {error && (
+        <div className="payment-alert" role="alert">
+          <span className="payment-alert__icon" aria-hidden="true">!</span>
+          <span>{error}</span>
+        </div>
+      )}
 
       {!request && !error ? (
         <p className="hint-text">Создаём заявку на оплату...</p>

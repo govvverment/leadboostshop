@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Screen from '../../components/Screen';
+import { useApp } from '../../context/AppContext';
 import { depositPresets, depositCurrency } from '../../mock/data';
 
 // BEP20 временно скрыт: бэкенд для него уже готов (deposit-create/
@@ -13,10 +14,27 @@ const NETWORKS = ['TRC20', 'ERC20'];
 
 export default function BalanceDeposit() {
   const navigate = useNavigate();
+  const { showToast } = useApp();
   const [amount, setAmount] = useState('');
   const [network, setNetwork] = useState(NETWORKS[0]);
 
   const numeric = Number(amount) || 0;
+
+  const handleNetworkSelect = (nextNetwork) => {
+    if (nextNetwork === 'ERC20') {
+      showToast('Сеть ERC20 временно недоступна для пополнения');
+      return;
+    }
+    setNetwork(nextNetwork);
+  };
+
+  const handleContinue = () => {
+    if (network === 'ERC20') {
+      showToast('Сеть ERC20 временно недоступна для пополнения');
+      return;
+    }
+    navigate('/balance/deposit/payment', { state: { amount: numeric, network } });
+  };
 
   return (
     <Screen title="Пополнение баланса">
@@ -72,7 +90,7 @@ export default function BalanceDeposit() {
           <button
             key={n}
             className={'network-chip' + (network === n ? ' is-active' : '')}
-            onClick={() => setNetwork(n)}
+            onClick={() => handleNetworkSelect(n)}
           >
             {n}
           </button>
@@ -82,7 +100,7 @@ export default function BalanceDeposit() {
       <button
         className="btn btn--primary btn--block btn--sticky"
         disabled={!numeric || numeric <= 0}
-        onClick={() => navigate('/balance/deposit/payment', { state: { amount: numeric, network } })}
+        onClick={handleContinue}
       >
         Продолжить
       </button>

@@ -56,17 +56,16 @@ export default function AdminInventory() {
   };
 
   const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     e.target.value = ''; // чтобы можно было выбрать тот же файл повторно
-    if (!file) return;
+    if (!files.length) return;
     setError(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      const fileText = String(reader.result).trim();
-      setText((prev) => (prev.trim() ? `${prev.trim()}\n${fileText}` : fileText));
-    };
-    reader.onerror = () => setError('Не удалось прочитать файл');
-    reader.readAsText(file, 'utf-8');
+    Promise.all(files.map((file) => file.text()))
+      .then((contents) => {
+        const fileText = contents.map((content) => content.trim()).filter(Boolean).join('\n');
+        setText((prev) => (prev.trim() ? `${prev.trim()}\n${fileText}` : fileText));
+      })
+      .catch(() => setError('Не удалось прочитать один из файлов'));
   };
 
   const handleUpload = async (e) => {
@@ -142,9 +141,10 @@ export default function AdminInventory() {
             </>
           ) : (
             <>
-              По одному аккаунту на строку, в формате{' '}
+              По одному аккаунту на строку: отдельная ссылка или данные в формате{' '}
               <code style={{ color: 'var(--accent)' }}>логин:пароль</code> (можно добавить ещё одно
-              поле через двоеточие — например email восстановления).
+              поле через двоеточие — например email восстановления). Каждый URL считается одним
+              отдельным аккаунтом.
             </>
           )}
         </p>
@@ -155,7 +155,7 @@ export default function AdminInventory() {
           placeholder={
             isLink
               ? 'https://drive.google.com/file/d/xxxxx\nhttps://mega.nz/file/yyyyy'
-              : 'user1:pass123\nuser2:pass456:backup@mail.com'
+              : 'https://example.com/account/xxxxx\nuser1:pass123\nuser2:pass456:backup@mail.com'
           }
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -163,8 +163,8 @@ export default function AdminInventory() {
         />
 
         <label className="btn btn--secondary btn--block" style={{ margin: '10px 0 0', textAlign: 'center' }}>
-          📄 Загрузить из .txt файла
-          <input type="file" accept=".txt,text/plain" onChange={handleFileSelect} style={{ display: 'none' }} />
+          📄 Загрузить из .txt файлов
+          <input type="file" accept=".txt,text/plain" multiple onChange={handleFileSelect} style={{ display: 'none' }} />
         </label>
         <p className="hint-text" style={{ textAlign: 'left', margin: '6px 0 0' }}>
           Содержимое файла добавится к тому, что уже есть в поле выше (те же строки, тот же формат).
@@ -190,11 +190,11 @@ export default function AdminInventory() {
           {items.map((item) => (
             <div key={item.id} className="list-row list-row--static">
               <div className="list-row__body">
-                <span className="list-row__title" style={isLink ? { wordBreak: 'break-all' } : undefined}>
-                  {isLink ? item.link : item.login}
+                <span className="list-row__title" style={item.link ? { wordBreak: 'break-all' } : undefined}>
+                  {item.link || item.login}
                 </span>
                 <span className="list-row__meta">
-                  {isLink && item.extra ? `${item.extra} · ` : ''}
+                  {item.extra ? `${item.extra} · ` : ''}
                   {item.status === 'sold' ? `Продан ${new Date(item.sold_at).toLocaleDateString('ru-RU')}` : 'Свободен'}
                 </span>
               </div>

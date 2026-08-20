@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 const ICONS = {
   profile: (
@@ -30,33 +30,38 @@ const ICONS = {
   ),
 };
 
+// У некоторых разделов есть "дочерние" экраны с другим префиксом пути
+// (например, карточка товара — /product/:id, а не /products/...), поэтому
+// одного React Router isActive (сравнение с `to`) недостаточно — заводим
+// список путей, которые тоже должны подсвечивать пункт меню.
 const items = [
-  { to: '/profile', label: 'Профиль', icon: 'profile' },
-  { to: '/products', label: 'Товары', icon: 'products' },
-  { to: '/purchases', label: 'Покупки', icon: 'purchases' },
-  { to: '/referrals', label: 'Рефералы', icon: 'referrals' },
+  { to: '/profile', label: 'Профиль', icon: 'profile', match: ['/profile'] },
+  { to: '/products', label: 'Товары', icon: 'products', match: ['/products', '/product'] },
+  { to: '/purchases', label: 'Покупки', icon: 'purchases', match: ['/purchases', '/subscriptions'] },
+  { to: '/referrals', label: 'Рефералы', icon: 'referrals', match: ['/referrals'] },
 ];
 
+function isItemActive(pathname, patterns) {
+  return patterns.some((path) => pathname === path || pathname.startsWith(path + '/'));
+}
+
 export default function BottomNav() {
+  const { pathname } = useLocation();
+
   return (
     <nav className="bottom-nav">
-      {items.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          className={({ isActive }) => 'bottom-nav__item' + (isActive ? ' is-active' : '')}
-        >
-          {({ isActive }) => (
-            <>
-              <span className="bottom-nav__icon" aria-hidden="true">
-                {ICONS[item.icon]}
-              </span>
-              <span className="bottom-nav__label">{item.label}</span>
-              {isActive && <span className="bottom-nav__indicator" />}
-            </>
-          )}
-        </NavLink>
-      ))}
+      {items.map((item) => {
+        const isActive = isItemActive(pathname, item.match);
+        return (
+          <NavLink key={item.to} to={item.to} className={'bottom-nav__item' + (isActive ? ' is-active' : '')}>
+            <span className="bottom-nav__icon" aria-hidden="true">
+              {ICONS[item.icon]}
+            </span>
+            <span className="bottom-nav__label">{item.label}</span>
+            {isActive && <span className="bottom-nav__indicator" />}
+          </NavLink>
+        );
+      })}
     </nav>
   );
 }
