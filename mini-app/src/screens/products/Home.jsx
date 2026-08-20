@@ -124,7 +124,7 @@ export default function ProductsHome() {
                 <div className="news-item__body">
                   <span className="news-item__title">{r.title}</span>
                   <span className="news-item__meta">
-                    {[r.geo, `Пополнено ${timeAgo(r.restockedAt)}`].filter(Boolean).join(' · ')}
+                    {[r.geo, r.type, `Пополнено ${timeAgo(r.restockedAt)}`].filter(Boolean).join(' · ')}
                   </span>
                 </div>
                 <span className="news-item__delta">+{r.qtyAdded} шт.</span>

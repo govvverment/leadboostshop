@@ -1,3 +1,4 @@
+import { Image } from 'https://deno.land/x/imagescript@1.3.0/mod.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import { corsHeaders, withCors } from '../_shared/cors.ts';
 import { requireAdminSession } from '../_shared/adminAuth.ts';
@@ -6,6 +7,34 @@ import { requireAdminSession } from '../_shared/adminAuth.ts';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+
+// Иконки категорий и фото товаров в приложении показываются максимум
+// ~48-64px (см. ProductImage.jsx), поэтому нет смысла хранить и грузить
+// оригиналы в несколько мегабайт — именно из-за них картинки долго
+// грузились. Сжимаем один раз при загрузке — дальше приложение отдаёт уже
+// лёгкий файл, быстро в любой сети.
+const MAX_DIMENSION = 480;
+const JPEG_QUALITY = 82;
+
+async function compress(file: File): Promise<{ bytes: Uint8Array; contentType: string; ext: string }> {
+  try {
+    const image = await Image.decode(new Uint8Array(await file.arrayBuffer()));
+    if (image.width > MAX_DIMENSION || image.height > MAX_DIMENSION) {
+      if (image.width >= image.height) image.resize(MAX_DIMENSION, Image.RESIZE_AUTO);
+      else image.resize(Image.RESIZE_AUTO, MAX_DIMENSION);
+    }
+    // PNG сохраняем как PNG (может быть прозрачность), остальное — в JPEG,
+    // он даёт заметно меньший размер файла для обычных фото.
+    if (file.type === 'image/png') {
+      return { bytes: await image.encode(), contentType: 'image/png', ext: 'png' };
+    }
+    return { bytes: await image.encodeJPEG(JPEG_QUALITY), contentType: 'image/jpeg', ext: 'jpg' };
+  } catch {
+    // Не смогли распознать/сжать (редкий/битый формат) — грузим как есть,
+    // лучше оригинал, чем ошибка загрузки.
+    return { bytes: new Uint8Array(await file.arrayBuffer()), contentType: file.type, ext: file.name.split('.').pop() || 'jpg' };
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -21,13 +50,18 @@ Deno.serve(async (req) => {
     if (!ALLOWED_TYPES.includes(file.type)) return withCors({ error: 'Разрешены только JPG, PNG или WebP' }, 400);
     if (file.size > MAX_SIZE) return withCors({ error: 'Файл слишком большой (максимум 5MB)' }, 400);
 
-    const ext = file.name.split('.').pop() || 'jpg';
+    const { bytes, contentType, ext } = await compress(file);
     const path = `${crypto.randomUUID()}.${ext}`;
 
     const supabase = supabaseAdmin();
     const { error } = await supabase.storage
       .from('product-images')
-      .upload(path, await file.arrayBuffer(), { contentType: file.type });
+      .upload(path, bytes, {
+        contentType,
+        // Картинка одна и та же на своём URL всегда — пусть телефон и
+        // Telegram кешируют её на год, а не качают заново на каждый показ.
+        cacheControl: '31536000',
+      });
 
     if (error) return withCors({ error: error.message }, 500);
 

@@ -53,7 +53,7 @@ export default function PurchasesHome() {
                     <span className="list-row__title">{entry.title}</span>
                     <span className="list-row__meta">
                       {(entry.kind === 'account'
-                        ? [entry.geo, entry.qty ? `${entry.qty} шт.` : null]
+                        ? [entry.geo, entry.type, entry.qty ? `${entry.qty} шт.` : null]
                         : [entry.platform, entry.type]
                       )
                         .filter(Boolean)

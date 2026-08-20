@@ -60,6 +60,7 @@ export async function fetchRecentRestocks(limit = 2) {
     geo: row.geo,
     geoFlag: row.geo_flag,
     platform: row.platform,
+    type: row.type,
     price: Number(row.price),
     qtyAdded: row.qty_added,
     restockedAt: new Date(row.restocked_at),

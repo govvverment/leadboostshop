@@ -228,13 +228,13 @@ grant select on products_with_stock to anon, authenticated;
 create or replace view recent_restocks as
 select
   ai.product_id,
-  p.title, p.image_url, p.geo, p.geo_flag, p.platform, p.price,
+  p.title, p.image_url, p.geo, p.geo_flag, p.platform, p.type, p.price,
   ai.created_at as restocked_at,
   count(*)::int as qty_added
 from account_inventory ai
 join products p on p.id = ai.product_id
 where p.is_archived = false and p.kind = 'account'
-group by ai.product_id, p.title, p.image_url, p.geo, p.geo_flag, p.platform, p.price, ai.created_at
+group by ai.product_id, p.title, p.image_url, p.geo, p.geo_flag, p.platform, p.type, p.price, ai.created_at
 order by ai.created_at desc;
 
 grant select on recent_restocks to anon, authenticated;
