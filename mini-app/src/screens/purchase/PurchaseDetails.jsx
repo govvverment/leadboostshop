@@ -56,9 +56,8 @@ export default function PurchaseDetails() {
 
   const specs = isAccount
     ? [
-        ['GEO', `${purchase.geo} ${purchase.geoFlag}`],
+        ['GEO', purchase.geo],
         ['Тип', purchase.type],
-        ['Платформа', purchase.platform],
         ['Количество', `${purchase.qty} шт.`],
       ]
     : [

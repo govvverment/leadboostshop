@@ -55,12 +55,9 @@ export default function ResultScreen({ type }) {
             <div className="sheet-product__body">
               <span className="sheet-product__title">{product.title}</span>
               <span className="sheet-product__subtitle">
-                {(product.kind === 'account'
-                  ? [product.geoFlag, product.geo, product.platform]
-                  : [product.platform, product.type]
-                )
-                  .filter(Boolean)
-                  .join(' · ')}
+                {product.kind === 'account'
+                  ? product.geo
+                  : [product.platform, product.type].filter(Boolean).join(' · ')}
               </span>
             </div>
             <span className="sheet-product__price">

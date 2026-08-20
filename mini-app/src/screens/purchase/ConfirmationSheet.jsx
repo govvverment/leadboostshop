@@ -61,12 +61,7 @@ export default function ConfirmationSheet() {
           <div className="sheet-product__body">
             <span className="sheet-product__title">{product.title}</span>
             <span className="sheet-product__subtitle">
-              {(isAccount
-                ? [product.geoFlag, product.geo, product.platform]
-                : [product.platform, product.type]
-              )
-                .filter(Boolean)
-                .join(' · ')}
+              {isAccount ? product.geo : [product.platform, product.type].filter(Boolean).join(' · ')}
             </span>
           </div>
           <span className="sheet-product__price">${product.price.toFixed(2)}</span>
