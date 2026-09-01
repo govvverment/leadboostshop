@@ -1265,12 +1265,18 @@
   height: 26px;
   width: auto;
   display: block;
+  transition: filter 0.2s ease;
 }
-.app-header__support-icon-img {
+/* Сам файл нарисован белым на прозрачном фоне — на светлом фоне
+   станет незаметным, если не инвертировать в чёрный. */
+[data-theme='light'] .app-header__logo-img {
+  filter: invert(1);
+}
+.app-header__support-icon {
   width: 15px;
   height: 15px;
-  margin-right: 4px;
-  vertical-align: -3px;
+  flex-shrink: 0;
+  display: block;
 }
 
 /* Page head (back + title), used instead of relying only on header on sub-pages */
