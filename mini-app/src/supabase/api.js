@@ -21,6 +21,7 @@ function mapProduct(row) {
     geoFlag: row.geo_flag,
     platform: row.platform,
     type: row.type,
+    network: row.network,
     stock: row.stock,
     license: row.license,
     period: row.period,
@@ -60,7 +61,6 @@ export async function fetchRecentRestocks(limit = 2) {
     geo: row.geo,
     geoFlag: row.geo_flag,
     platform: row.platform,
-    type: row.type,
     price: Number(row.price),
     qtyAdded: row.qty_added,
     restockedAt: new Date(row.restocked_at),
@@ -152,6 +152,7 @@ function mapSubscription(row) {
     endedAt: activeUntil, // пока нет отдельной логики истечения — та же дата
     accessLink: row.access_link,
     accessKey: row.access_key,
+    accessInstructionsUrl: row.access_instructions_url,
   };
 }
 

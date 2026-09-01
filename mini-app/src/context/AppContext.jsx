@@ -46,7 +46,7 @@ import {
 } from '../supabase/api';
 import { getTelegramInitData, getUrlRefParam } from '../hooks/useTelegramUser';
 import Screen from '../components/Screen';
-import { LoaderDefault } from '../components/Loader';
+import { LoaderDefault, ErrorState } from '../components/Loader';
 
 const AppContext = createContext(null);
 
@@ -96,6 +96,8 @@ export function AppProvider({ children }) {
   const [balanceHistory, setBalanceHistory] = useState(mockBalanceHistory);
   const [toast, setToast] = useState(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   const getProduct = useCallback((id) => products.find((p) => p.id === id), [products]);
 
@@ -119,6 +121,7 @@ export function AppProvider({ children }) {
     let cancelled = false;
     (async () => {
       try {
+        setLoadError(null);
         await authenticate(initData, getUrlRefParam()); // регистрирует юзера, привязывает реферала (один раз)
         const [snapshot, freshProducts, freshCategories, freshRestocks] = await Promise.all([
           fetchAccountSnapshot(initData),
@@ -137,6 +140,7 @@ export function AppProvider({ children }) {
         setRestocks(freshRestocks);
       } catch (err) {
         console.error('Не удалось загрузить данные аккаунта:', err);
+        if (!cancelled) setLoadError(err.message || 'Не удалось загрузить данные');
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -145,7 +149,7 @@ export function AppProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [real]);
+  }, [real, retryKey]);
 
   const refreshAccount = useCallback(async () => {
     if (!real) return;
@@ -226,6 +230,7 @@ export function AppProvider({ children }) {
                   activeUntil: periodDate.toLocaleDateString('ru-RU'),
                   accessLink: `t.me/${currentProduct.id}_bot`,
                   accessKey: 'XX-' + Math.random().toString(36).slice(2, 10).toUpperCase(),
+                  accessInstructionsUrl: 'https://t.me/leadboost_docs',
                 },
                 ...prev,
               ];
@@ -252,10 +257,20 @@ export function AppProvider({ children }) {
                 date: new Date().toLocaleDateString('ru-RU'),
                 time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
                 status: 'paid',
-                file:
+                credentials:
                   currentProduct.kind === 'account'
-                    ? { name: `accounts_${Date.now()}.txt`, meta: `${qty} аккаунтов · TXT · ${currentProduct.geo}` }
-                    : { name: `${currentProduct.id}_license.zip`, meta: 'Файл программы · Лицензия' },
+                    ? Array.from({ length: qty }, (_, i) => ({
+                        login: `demo_user${i + 1}`,
+                        password: 'demoPass' + Math.random().toString(36).slice(2, 8),
+                        extra: null,
+                      }))
+                    : [
+                        {
+                          link: `https://drive.google.com/file/d/${currentProduct.id}`,
+                          extra: 'XX-' + Math.random().toString(36).slice(2, 10).toUpperCase(),
+                          instructionsUrl: 'https://t.me/leadboost_docs',
+                        },
+                      ],
               },
               ...prev,
             ]);
@@ -334,6 +349,19 @@ export function AppProvider({ children }) {
     },
     [real, refreshAccount]
   );
+
+  if (real === true && ready && loadError) {
+    return (
+      <Screen title="LEAD BOOST" withNav={false} withHeader={false}>
+        <ErrorState
+          onRetry={() => {
+            setReady(false);
+            setRetryKey((k) => k + 1);
+          }}
+        />
+      </Screen>
+    );
+  }
 
   if (real !== false && !ready) {
     return (

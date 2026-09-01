@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import Screen from '../../components/Screen';
 import EmptyState from '../../components/EmptyState';
+import Icon from '../../components/Icon';
 import ProductIcon from '../../components/ProductIcon';
 import ProductImage from '../../components/ProductImage';
 import { useApp } from '../../context/AppContext';
@@ -33,7 +34,8 @@ export default function PurchasesHome() {
 
       {combined.length === 0 ? (
         <EmptyState
-          icon="🔖"
+          icon={<Icon name="packageBookmark" size={24} />}
+          square
           title="Покупок пока нет"
           subtitle="Здесь появятся купленные товары и активные подписки"
           action={
@@ -53,7 +55,7 @@ export default function PurchasesHome() {
                     <span className="list-row__title">{entry.title}</span>
                     <span className="list-row__meta">
                       {(entry.kind === 'account'
-                        ? [entry.geo, entry.type, entry.qty ? `${entry.qty} шт.` : null]
+                        ? [entry.geoFlag, entry.geo, entry.platform, entry.qty ? `${entry.qty} шт.` : null]
                         : [entry.platform, entry.type]
                       )
                         .filter(Boolean)

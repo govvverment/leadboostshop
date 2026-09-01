@@ -3,7 +3,7 @@ import { corsHeaders, withCors } from '../_shared/cors.ts';
 import { requireAdminSession } from '../_shared/adminAuth.ts';
 
 // POST { token в заголовке Authorization, action, ...данные }
-// action: 'list' | 'create' | 'update' | 'archive' | 'restore'
+// action: 'list' | 'create' | 'update' | 'archive' | 'restore' | 'delete'
 
 function mapProduct(row: Record<string, unknown>) {
   return {
@@ -18,6 +18,7 @@ function mapProduct(row: Record<string, unknown>) {
     geoFlag: row.geo_flag,
     platform: row.platform,
     type: row.type,
+    network: row.network,
     stock: row.stock,
     license: row.license,
     period: row.period,
@@ -43,37 +44,55 @@ function validateProduct(body: Record<string, unknown>): string | null {
   return null;
 }
 
+// Общий разбор текста склада — используется и при первичной загрузке
+// (create с inventoryText), и при пополнении (bulk-add-inventory), чтобы
+// формат строк не мог разойтись между двумя местами.
+//
+// kind='one-time'/'subscription': ссылка[:ключ доступа[:ссылка на
+// инструкцию]] — разделители ищем только после "схема://", чтобы не
+// спутать с двоеточиями внутри самих ссылок.
+// kind='account': login:password[:доп.инфо] ИЛИ одна голая ссылка —
+// тогда аккаунт выдаётся как {link}, а не {login,password}.
 function buildInventoryRows(productId: string, kind: string, text: string) {
   const lines = text
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
 
-  if (lines.length === 0) return { rows: [], error: 'Не найдено ни одной строки' };
+  if (lines.length === 0) return { rows: [] as Record<string, unknown>[], error: 'Не найдено ни одной строки' };
 
   const rows: Record<string, unknown>[] = [];
   if (kind === 'one-time' || kind === 'subscription') {
     for (const line of lines) {
-      // Разделитель доп. инфо ищем только после схемы URL,
-      // чтобы не принять двоеточие в https:// за разделитель.
       const schemeMatch = line.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//);
       const searchFrom = schemeMatch ? schemeMatch[0].length : 0;
       const sepIndex = line.indexOf(':', searchFrom);
       const link = sepIndex === -1 ? line : line.slice(0, sepIndex).trim();
-      const extra = sepIndex === -1 ? null : line.slice(sepIndex + 1).trim() || null;
+      const rest = sepIndex === -1 ? '' : line.slice(sepIndex + 1).trim();
+
+      // Необязательная ссылка на инструкцию — третье поле, само тоже
+      // ссылка. Ищем начало ВТОРОЙ "схема://" в остатке строки, чтобы
+      // не спутать с двоеточиями внутри самого ключа.
+      const instructionsMatch = rest.match(/[a-zA-Z][a-zA-Z0-9+.-]*:\/\/\S+$/);
+      const extra = instructionsMatch
+        ? rest.slice(0, instructionsMatch.index).replace(/:$/, '').trim() || null
+        : rest || null;
+      const instructionsUrl = instructionsMatch ? instructionsMatch[0] : null;
+
       rows.push({
         id: crypto.randomUUID(),
         product_id: productId,
         link,
         extra,
+        instructions_url: instructionsUrl,
         status: 'available',
       });
     }
   } else {
     for (const line of lines) {
-      // Для аккаунтов поддерживаем два формата в одном и том же TXT:
-      // login:password[:extra] или одна ссылка, представляющая один
-      // аккаунт. URL сохраняем целиком, не разбирая двоеточия внутри.
+      // Голая ссылка целиком — один аккаунт-ссылка (см. миграцию
+      // account_links). URL сохраняем целиком, не разбирая двоеточия
+      // внутри него.
       if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/\S+$/.test(line)) {
         rows.push({
           id: crypto.randomUUID(),
@@ -100,7 +119,7 @@ function buildInventoryRows(productId: string, kind: string, text: string) {
     }
   }
 
-  return { rows, error: null };
+  return { rows, error: null as string | null };
 }
 
 Deno.serve(async (req) => {
@@ -167,6 +186,7 @@ Deno.serve(async (req) => {
         geo_flag: body.geoFlag ?? null,
         platform: body.platform ?? null,
         type: body.type ?? null,
+        network: body.kind === 'account' ? body.network ?? null : null,
         stock: body.kind === 'account' ? body.stock ?? 0 : null,
         license: body.kind === 'one-time' ? body.license ?? null : null,
         period: body.kind === 'subscription' ? body.period ?? 'мес' : null,
@@ -217,6 +237,7 @@ Deno.serve(async (req) => {
           geo_flag: pick('geoFlag', 'geo_flag'),
           platform: pick('platform'),
           type: pick('type'),
+          network: pick('network'),
           stock: pick('stock'),
           license: pick('license'),
           period: pick('period'),
@@ -239,6 +260,37 @@ Deno.serve(async (req) => {
       return withCors({ ok: true });
     }
 
+    // Безвозвратное удаление товара из БД (не архивация — строка
+    // целиком пропадает и из products, и из склада). Сначала чистим
+    // account_inventory — эти строки ничего не держат, удаляются всегда.
+    // Сам products при этом можно удалить, только если товар НИКОГДА не
+    // покупали: purchases/subscriptions ссылаются на products(id) без
+    // cascade — и это специально так, чтобы удаление товара не стирало
+    // историю покупок и статистику клиентов. Если такие покупки есть,
+    // Postgres вернёт foreign_key_violation (23503) — превращаем это в
+    // понятное сообщение и предлагаем архивировать вместо удаления.
+    if (action === 'delete') {
+      if (!body.id) return withCors({ error: 'id обязателен' }, 400);
+
+      const { error: invError } = await supabase.from('account_inventory').delete().eq('product_id', body.id);
+      if (invError) return withCors({ error: invError.message }, 500);
+
+      const { error } = await supabase.from('products').delete().eq('id', body.id);
+      if (error) {
+        if (error.code === '23503') {
+          return withCors(
+            {
+              error:
+                'Этот товар уже покупали — удалить нельзя, иначе пропадёт история покупок клиентов. Используйте архивацию.',
+            },
+            409
+          );
+        }
+        return withCors({ error: error.message }, 500);
+      }
+      return withCors({ ok: true });
+    }
+
     // Склад: посмотреть, что уже загружено (аккаунты login:password
     // ИЛИ ссылки для разовых покупок — то и другое живёт в одной
     // таблице account_inventory)
@@ -246,7 +298,7 @@ Deno.serve(async (req) => {
       if (!body.productId) return withCors({ error: 'productId обязателен' }, 400);
       const { data, error } = await supabase
         .from('account_inventory')
-        .select('id, login, link, extra, status, created_at, sold_at')
+        .select('id, login, link, extra, instructions_url, status, created_at, sold_at')
         .eq('product_id', body.productId)
         .order('created_at', { ascending: false });
       if (error) return withCors({ error: error.message }, 500);
@@ -255,8 +307,9 @@ Deno.serve(async (req) => {
 
     // Пакетная загрузка. Для товаров kind='account' — по строке на
     // аккаунт (login:password или login:password:доп.инфо). Для
-    // kind='one-time' — по строке на ссылку скачивания (без разбора
-    // по ':', т.к. в самой ссылке двоеточий полно).
+    // kind='one-time'/'subscription' — ссылка[:ключ доступа[:ссылка на
+    // инструкцию]] (без разбора по ':', т.к. в самих ссылках двоеточий
+    // полно — ищем разделители только после "схема://").
     if (action === 'bulk-add-inventory') {
       if (!body.productId) return withCors({ error: 'productId обязателен' }, 400);
       if (!body.text || typeof body.text !== 'string') return withCors({ error: 'Пустой список' }, 400);

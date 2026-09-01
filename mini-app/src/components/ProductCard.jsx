@@ -22,7 +22,7 @@ export default function ProductCard({ product }) {
         {isAccount ? (
           <>
             <span className="product-row__subtitle">
-              {[product.geo, product.type].filter(Boolean).join(' · ')}
+              {[product.geoFlag, product.geo, product.platform].filter(Boolean).join(' · ')}
             </span>
             {outOfStock ? (
               <span className="badge badge--muted">Нет в наличии</span>

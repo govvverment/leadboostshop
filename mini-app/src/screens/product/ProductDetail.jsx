@@ -37,22 +37,25 @@ export default function ProductDetail() {
   const outOfStock = product.stock <= 0;
   const total = isAccount ? +(product.price * qty).toFixed(2) : product.price;
 
-  const specs = isAccount
-    ? [
-        ['GEO', product.geo],
-        ['Тип', product.type],
-      ]
-    : isSubscription
-    ? [
-        ['Период', product.periodLabel],
-        ['Тип', product.type],
-        ['Платформа', product.platform],
-      ]
-    : [
-        ['Лицензия', product.license],
-        ['Тип', product.type],
-        ['Платформа', product.platform],
-      ];
+  const specs = (
+    isAccount
+      ? [
+          ['GEO', [product.geo, product.geoFlag].filter(Boolean).join(' ')],
+          ['Тип', product.type],
+          ['Платформа', product.platform],
+        ]
+      : isSubscription
+      ? [
+          ['Период', product.periodLabel],
+          ['Тип', product.type],
+          ['Платформа', product.platform],
+        ]
+      : [
+          ['Лицензия', product.license],
+          ['Тип', product.type],
+          ['Платформа', product.platform],
+        ]
+  ).filter(([, value]) => Boolean(value));
 
   return (
     <Screen title="Товар">

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import Screen from '../../components/Screen';
+import Icon from '../../components/Icon';
 import { user as mockUser } from '../../mock/data';
 import { useApp } from '../../context/AppContext';
 import { useTelegramUser } from '../../hooks/useTelegramUser';
@@ -20,9 +21,9 @@ export default function ProfileHome() {
   const photoUrl = tgUser?.photoUrl;
 
   const menu = [
-    { icon: '⟲', label: 'История баланса', to: '/balance/history' },
-    { icon: '⚟', label: 'Поддержка', onClick: openSupportChat },
-    { icon: '▤', label: 'Условия и политика', to: '/profile/terms' },
+    { icon: 'history', label: 'История баланса', to: '/balance/history' },
+    { icon: 'headset', label: 'Поддержка', onClick: openSupportChat },
+    { icon: 'document', label: 'Условия и политика', to: '/profile/terms' },
   ];
 
   return (
@@ -53,7 +54,9 @@ export default function ProfileHome() {
       <div className="menu-list">
         {menu.map((item) => (
           <button key={item.label} className="menu-row" onClick={item.onClick ?? (() => navigate(item.to))}>
-            <span className="menu-row__icon">{item.icon}</span>
+            <span className="menu-row__icon">
+              <Icon name={item.icon} size={18} />
+            </span>
             <span className="menu-row__label">{item.label}</span>
             <span className="menu-row__chevron">›</span>
           </button>
@@ -64,7 +67,9 @@ export default function ProfileHome() {
             на backend, это лишь скрывает пункт от обычных покупателей. */}
         {isAdmin && (
           <button className="menu-row" onClick={() => navigate('/admin/products')}>
-            <span className="menu-row__icon">⚙</span>
+            <span className="menu-row__icon">
+              <Icon name="gear" size={18} />
+            </span>
             <span className="menu-row__label">Админ-панель</span>
             <span className="menu-row__chevron">›</span>
           </button>

@@ -134,6 +134,7 @@ export const subscriptions = [
     activeUntil: '10.09.2026',
     accessLink: 't.me/automation_tool_bot',
     accessKey: 'AT-92XK-7QLM',
+    accessInstructionsUrl: 'https://t.me/leadboost_docs',
   },
   {
     id: 's2',
@@ -148,6 +149,7 @@ export const subscriptions = [
     endedAt: '02.08.2026',
     accessLink: 't.me/crm_connector_bot',
     accessKey: 'CC-11AZ-40PP',
+    accessInstructionsUrl: 'https://t.me/leadboost_docs',
   },
 ];
 

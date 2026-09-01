@@ -82,6 +82,15 @@ create table if not exists purchases (
   file_name   text, -- legacy, не используется в текущей версии
   file_meta   text, -- legacy, не используется в текущей версии
   credentials jsonb, -- снимок выданных логин/пароль или ссылки на момент покупки
+  -- Снимок характеристик товара НА МОМЕНТ покупки — намеренно
+  -- дублируется из products, а не читается оттуда "живьём": если
+  -- товар потом изменится или уйдёт в архив, у уже купленного всё
+  -- равно должны остаться правильные GEO/платформа/тип на экране.
+  geo         text,
+  geo_flag    text,
+  platform    text,
+  type        text,
+  license     text,
   created_at  timestamptz not null default now()
 );
 alter table purchases enable row level security;
@@ -91,18 +100,21 @@ alter table purchases enable row level security;
 -- Подписки
 -- ------------------------------------------------------------
 create table if not exists subscriptions (
-  id            text primary key,
-  user_id       bigint not null references users(telegram_id),
-  product_id    text not null references products(id),
-  title         text not null,
-  price         numeric(10,2) not null,
-  period        text,
-  period_label  text,
-  status        text not null default 'active',
-  active_until  timestamptz,
-  access_link   text,
-  access_key    text,
-  created_at    timestamptz not null default now()
+  id                       text primary key,
+  user_id                  bigint not null references users(telegram_id),
+  product_id               text not null references products(id),
+  title                    text not null,
+  price                    numeric(10,2) not null,
+  period                   text,
+  period_label             text,
+  status                   text not null default 'active',
+  active_until             timestamptz,
+  access_link              text,
+  access_key               text,
+  access_instructions_url  text,
+  platform                 text, -- снимок с товара на момент оформления/продления, см. purchases выше
+  type                     text,
+  created_at               timestamptz not null default now()
 );
 alter table subscriptions enable row level security;
 -- Публичных политик нет — доступ только через Edge Functions.
@@ -149,8 +161,8 @@ alter table admin_sessions enable row level security;
 -- Публичных политик нет — доступ только через Edge Functions.
 
 -- ------------------------------------------------------------
--- Склад — одна строка = один настоящий аккаунт (login/password ИЛИ link)
--- или одна ссылка на скачивание (link, для kind='one-time'/'subscription').
+-- Склад — одна строка = один настоящий аккаунт (login/password) ИЛИ
+-- одна ссылка на скачивание (link, для kind='one-time'/'subscription').
 -- Реальные данные НИКОГДА не читаются напрямую через anon-ключ, только
 -- через Edge Functions (service_role), и то — покупателю выдаётся
 -- ровно его строка, остальным доступа нет вообще.
@@ -162,6 +174,7 @@ create table if not exists account_inventory (
   password     text,
   extra        text, -- необязательное доп. поле (email восстановления / ключ активации)
   link         text, -- для one-time/subscription — ссылка на скачивание
+  instructions_url text, -- необязательная ссылка на инструкцию (для one-time/subscription)
   status       text not null default 'available', -- available | sold
   purchase_id  text references purchases(id) deferrable initially deferred,
   created_at   timestamptz not null default now(),
@@ -169,8 +182,6 @@ create table if not exists account_inventory (
 );
 alter table account_inventory enable row level security;
 -- Публичных политик нет — доступ только через Edge Functions.
-
-alter table purchases add column if not exists credentials jsonb;
 
 -- ------------------------------------------------------------
 -- Заявки на пополнение баланса (USDT). Уникальная сумма — способ
@@ -228,13 +239,13 @@ grant select on products_with_stock to anon, authenticated;
 create or replace view recent_restocks as
 select
   ai.product_id,
-  p.title, p.image_url, p.geo, p.geo_flag, p.platform, p.type, p.price,
+  p.title, p.image_url, p.geo, p.geo_flag, p.platform, p.price,
   ai.created_at as restocked_at,
   count(*)::int as qty_added
 from account_inventory ai
 join products p on p.id = ai.product_id
 where p.is_archived = false and p.kind = 'account'
-group by ai.product_id, p.title, p.image_url, p.geo, p.geo_flag, p.platform, p.type, p.price, ai.created_at
+group by ai.product_id, p.title, p.image_url, p.geo, p.geo_flag, p.platform, p.price, ai.created_at
 order by ai.created_at desc;
 
 grant select on recent_restocks to anon, authenticated;
@@ -348,6 +359,7 @@ declare
   v_credentials jsonb;
   v_link text;
   v_extra text;
+  v_instructions_url text;
 begin
   select * into v_product from products where id = p_product_id and is_archived = false;
   if not found then
@@ -393,19 +405,15 @@ begin
       set status = 'sold', purchase_id = v_purchase_id, sold_at = now()
       from picked
       where ai.id = picked.id
-      returning ai.login, ai.password, ai.extra, ai.link
+      returning ai.login, ai.password, ai.extra
     )
-    select jsonb_agg(
-      case
-        when link is not null then jsonb_build_object('link', link)
-        else jsonb_build_object('login', login, 'password', password, 'extra', extra)
-      end
-    )
+    select jsonb_agg(jsonb_build_object('login', login, 'password', password, 'extra', extra))
       into v_credentials
     from updated;
 
-    insert into purchases (id, user_id, product_id, title, kind, qty, price, status, credentials)
-    values (v_purchase_id, p_telegram_id, p_product_id, v_product.title, v_product.kind, p_qty, v_total, 'paid', v_credentials);
+    insert into purchases (id, user_id, product_id, title, kind, qty, price, status, credentials, geo, geo_flag, platform, type)
+    values (v_purchase_id, p_telegram_id, p_product_id, v_product.title, v_product.kind, p_qty, v_total, 'paid', v_credentials,
+            v_product.geo, v_product.geo_flag, v_product.platform, v_product.type);
 
     insert into balance_history (id, user_id, type, title, meta, amount, status)
     values ('h_' || replace(gen_random_uuid()::text, '-', ''), p_telegram_id, 'purchase',
@@ -426,19 +434,23 @@ begin
       set status = 'sold', purchase_id = v_purchase_id, sold_at = now()
       from picked
       where ai.id = picked.id
-      returning ai.link
+      returning ai.link, ai.extra, ai.instructions_url
     )
-    select jsonb_agg(jsonb_build_object('link', link)) into v_credentials
+    select jsonb_agg(jsonb_build_object('link', link, 'extra', extra, 'instructionsUrl', instructions_url))
+      into v_credentials
     from updated;
 
-    insert into purchases (id, user_id, product_id, title, kind, price, status, credentials)
-    values (v_purchase_id, p_telegram_id, p_product_id, v_product.title, v_product.kind, v_total, 'paid', v_credentials);
+    insert into purchases (id, user_id, product_id, title, kind, price, status, credentials, platform, type, license)
+    values (v_purchase_id, p_telegram_id, p_product_id, v_product.title, v_product.kind, v_total, 'paid', v_credentials,
+            v_product.platform, v_product.type, v_product.license);
 
     insert into balance_history (id, user_id, type, title, meta, amount, status)
     values ('h_' || replace(gen_random_uuid()::text, '-', ''), p_telegram_id, 'purchase',
             v_product.title, null, -v_total, 'success');
 
   elsif v_product.kind = 'subscription' then
+    -- Забираем свежую свободную строку склада (ссылка + доп.инфо +
+    -- инструкция) — при каждой подписке И при каждом продлении.
     with picked as (
       select id from account_inventory
       where product_id = p_product_id and status = 'available'
@@ -451,9 +463,9 @@ begin
       set status = 'sold', sold_at = now()
       from picked
       where ai.id = picked.id
-      returning ai.link, ai.extra
+      returning ai.link, ai.extra, ai.instructions_url
     )
-    select link, extra into v_link, v_extra from updated;
+    select link, extra, instructions_url into v_link, v_extra, v_instructions_url from updated;
 
     select * into v_existing_sub from subscriptions
       where user_id = p_telegram_id and product_id = p_product_id
@@ -462,16 +474,19 @@ begin
     if found then
       update subscriptions
       set status = 'active', active_until = now() + interval '1 month',
-          access_link = v_link, access_key = coalesce(v_extra, access_key)
+          access_link = v_link, access_key = coalesce(v_extra, access_key),
+          access_instructions_url = coalesce(v_instructions_url, access_instructions_url),
+          platform = v_product.platform, type = v_product.type
       where id = v_existing_sub.id;
     else
       v_sub_id := 's_' || replace(gen_random_uuid()::text, '-', '');
-      insert into subscriptions (id, user_id, product_id, title, price, period, period_label, status, active_until, access_link, access_key)
+      insert into subscriptions (id, user_id, product_id, title, price, period, period_label, status, active_until, access_link, access_key, access_instructions_url, platform, type)
       values (
         v_sub_id, p_telegram_id, p_product_id, v_product.title, v_product.price,
         v_product.period, v_product.period_label, 'active', now() + interval '1 month',
         v_link,
-        coalesce(v_extra, upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10)))
+        coalesce(v_extra, upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10))),
+        v_instructions_url, v_product.platform, v_product.type
       );
     end if;
 

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import Screen from '../../components/Screen';
 import EmptyState from '../../components/EmptyState';
+import Icon from '../../components/Icon';
 import ProductIcon from '../../components/ProductIcon';
 import ProductImage from '../../components/ProductImage';
 import { useApp } from '../../context/AppContext';
@@ -23,7 +24,8 @@ export default function PurchasesSubscriptions() {
 
       {subscriptions.length === 0 ? (
         <EmptyState
-          icon="🔖"
+          icon={<Icon name="packageBookmark" size={24} />}
+          square
           title="Активных подписок пока нет"
           subtitle="Здесь появятся ваши активные подписки"
           action={

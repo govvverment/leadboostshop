@@ -442,3 +442,6 @@ verify_jwt = false
 
 [functions.admin-upload]
 verify_jwt = false
+
+[functions.download-purchase-file]
+verify_jwt = false

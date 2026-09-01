@@ -15,6 +15,7 @@ const emptyForm = {
   geoFlag: '',
   platform: '',
   type: '',
+  network: '',
   stock: '',
   license: '',
   period: 'мес',
@@ -126,6 +127,7 @@ export default function AdminProductForm() {
       geoFlag: form.kind === 'account' ? geoToFlag(form.geo) : null,
       platform: form.platform || null,
       type: form.type || null,
+      network: form.kind === 'account' ? form.network || null : null,
       stock: form.kind === 'account' ? Number(form.stock) : null,
       license: form.kind === 'one-time' ? form.license : null,
       period: form.kind === 'subscription' ? form.period : null,
@@ -280,6 +282,21 @@ export default function AdminProductForm() {
             <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
               Флаг подставится сам по названию страны (по-русски или по-английски). Если страна не
               распознана — просто сохранится без флага.
+            </span>
+          </Field>
+        )}
+
+        {form.kind === 'account' && (
+          <Field label="Соцсеть">
+            <input
+              className="text-input"
+              value={form.network}
+              onChange={(e) => update('network', e.target.value)}
+              placeholder="Instagram"
+            />
+            <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
+              Показывается отдельным фильтром в каталоге (наравне с GEO). Заполняйте одинаково
+              для одной и той же соцсети — например, всегда «Instagram», а не иногда «instagram».
             </span>
           </Field>
         )}

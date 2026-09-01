@@ -135,9 +135,10 @@ export default function AdminInventory() {
           {isLink ? (
             <>
               По одной ссылке на строку — каждая выдаётся ровно одному покупателю (для подписки —
-              при каждой оплате/продлении берётся новая) и больше никому не показывается. Можно
-              добавить доп.инфо через двоеточие после ссылки — например ключ активации:{' '}
-              <code style={{ color: 'var(--accent)' }}>https://...:KEY-1234</code>
+              при каждой оплате/продлении берётся новая) и больше никому не показывается. Через
+              двоеточие можно добавить ключ доступа, а через ещё одно — ссылку на инструкцию (обе
+              части необязательные):{' '}
+              <code style={{ color: 'var(--accent)' }}>https://файл...:KEY-1234:https://инструкция...</code>
             </>
           ) : (
             <>
@@ -154,7 +155,7 @@ export default function AdminInventory() {
           rows={8}
           placeholder={
             isLink
-              ? 'https://drive.google.com/file/d/xxxxx\nhttps://mega.nz/file/yyyyy'
+              ? 'https://drive.google.com/file/d/xxxxx\nhttps://mega.nz/file/yyyyy:KEY-1234:https://docs.google.com/instructions'
               : 'https://example.com/account/xxxxx\nuser1:pass123\nuser2:pass456:backup@mail.com'
           }
           value={text}
@@ -195,6 +196,7 @@ export default function AdminInventory() {
                 </span>
                 <span className="list-row__meta">
                   {item.extra ? `${item.extra} · ` : ''}
+                  {item.instructions_url ? 'есть инструкция · ' : ''}
                   {item.status === 'sold' ? `Продан ${new Date(item.sold_at).toLocaleDateString('ru-RU')}` : 'Свободен'}
                 </span>
               </div>

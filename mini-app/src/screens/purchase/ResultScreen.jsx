@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProductImage from '../../components/ProductImage';
-import Screen from '../../components/Screen';
+import SheetOverlay from '../../components/SheetOverlay';
 
 export default function ResultScreen({ type }) {
   const navigate = useNavigate();
@@ -42,56 +42,53 @@ export default function ResultScreen({ type }) {
   }[type];
 
   return (
-    <Screen title="Покупка" withNav={false}>
-      <div className="sheet sheet--center">
-        <div className="sheet__handle" />
-        <div className={`sheet-icon sheet-icon--${config.tone}`}>{config.icon}</div>
-        <h1 className="sheet__title">{config.title}</h1>
-        <p className="sheet__subtitle">{config.subtitle}</p>
+    <SheetOverlay className="sheet--center">
+      <div className={`sheet-icon sheet-icon--${config.tone}`}>{config.icon}</div>
+      <h1 className="sheet__title">{config.title}</h1>
+      <p className="sheet__subtitle">{config.subtitle}</p>
 
-        {product && (
-          <div className="sheet-product">
-            <ProductImage product={product} />
-            <div className="sheet-product__body">
-              <span className="sheet-product__title">{product.title}</span>
-              <span className="sheet-product__subtitle">
-                {(product.kind === 'account'
-                  ? [product.geo, product.type]
-                  : [product.platform, product.type]
-                )
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
-            </div>
-            <span className="sheet-product__price">
-              {qty ? `${qty} шт.` : ''}
-              <br />${(total ?? product.price).toFixed(2)}
+      {product && (
+        <div className="sheet-product">
+          <ProductImage product={product} />
+          <div className="sheet-product__body">
+            <span className="sheet-product__title">{product.title}</span>
+            <span className="sheet-product__subtitle">
+              {(product.kind === 'account'
+                ? [product.geoFlag, product.geo, product.platform]
+                : [product.platform, product.type]
+              )
+                .filter(Boolean)
+                .join(' · ')}
             </span>
           </div>
-        )}
+          <span className="sheet-product__price">
+            {qty ? `${qty} шт.` : ''}
+            <br />${(total ?? product.price).toFixed(2)}
+          </span>
+        </div>
+      )}
 
-        {type === 'insufficient' && product && (
-          <div className="detail-list detail-list--flat">
-            {balance != null && (
-              <div className="detail-list__row">
-                <span>Ваш баланс</span>
-                <span>${balance.toFixed(2)}</span>
-              </div>
-            )}
+      {type === 'insufficient' && product && (
+        <div className="detail-list detail-list--flat">
+          {balance != null && (
             <div className="detail-list__row">
-              <span>Не хватает</span>
-              <span className="detail-list__danger">${shortfall.toFixed(2)}</span>
+              <span>Ваш баланс</span>
+              <span>${balance.toFixed(2)}</span>
             </div>
+          )}
+          <div className="detail-list__row">
+            <span>Не хватает</span>
+            <span className="detail-list__danger">${shortfall.toFixed(2)}</span>
           </div>
-        )}
+        </div>
+      )}
 
-        <button className="btn btn--primary btn--block" onClick={config.primary.onClick}>
-          {config.primary.label}
-        </button>
-        <button className="btn btn--ghost btn--block" onClick={config.secondary.onClick}>
-          {config.secondary.label}
-        </button>
-      </div>
-    </Screen>
+      <button className="btn btn--primary btn--block" onClick={config.primary.onClick}>
+        {config.primary.label}
+      </button>
+      <button className="btn btn--ghost btn--block" onClick={config.secondary.onClick}>
+        {config.secondary.label}
+      </button>
+    </SheetOverlay>
   );
 }

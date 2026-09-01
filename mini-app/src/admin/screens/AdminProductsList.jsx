@@ -17,6 +17,7 @@ export default function AdminProductsList() {
   const [products, setProducts] = useState(null);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [query, setQuery] = useState('');
 
   const load = () => {
@@ -38,6 +39,28 @@ export default function AdminProductsList() {
       setError(err.message);
     } finally {
       setBusyId(null);
+    }
+  };
+
+  // Полное удаление из БД — не архивация, товар и его склад исчезают
+  // безвозвратно. Если товар уже покупали, backend откажет (есть
+  // покупки, которые на него ссылаются) — тогда покажем его ответ
+  // как обычную ошибку с подсказкой архивировать вместо удаления.
+  const deleteProduct = async (product) => {
+    const confirmed = window.confirm(
+      `Удалить «${product.title}» без возможности восстановления? Весь склад товара будет стёрт.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(product.id);
+    setError(null);
+    try {
+      await adminApi.deleteProduct(product.id);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -114,9 +137,16 @@ export default function AdminProductsList() {
                   <button
                     className={'btn btn--sm ' + (p.isArchived ? 'btn--secondary' : 'btn--danger-outline')}
                     onClick={() => toggleArchive(p)}
-                    disabled={busyId === p.id}
+                    disabled={busyId === p.id || deletingId === p.id}
                   >
                     {p.isArchived ? 'Вернуть' : 'В архив'}
+                  </button>
+                  <button
+                    className="btn btn--danger btn--sm"
+                    onClick={() => deleteProduct(p)}
+                    disabled={busyId === p.id || deletingId === p.id}
+                  >
+                    {deletingId === p.id ? 'Удаление...' : 'Удалить'}
                   </button>
                 </div>
               </div>

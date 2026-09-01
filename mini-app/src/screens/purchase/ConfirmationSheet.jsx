@@ -1,6 +1,7 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import Screen from '../../components/Screen';
+import SheetOverlay from '../../components/SheetOverlay';
 import EmptyState from '../../components/EmptyState';
 import ProductImage from '../../components/ProductImage';
 import { LoaderCompact } from '../../components/Loader';
@@ -50,68 +51,71 @@ export default function ConfirmationSheet() {
   };
 
   return (
-    <Screen title="Подтверждение" withNav={false}>
-      <div className="sheet">
-        <div className="sheet__handle" />
-        <h1 className="sheet__title">Подтвердить покупку</h1>
-        <p className="sheet__subtitle">Проверьте данные перед подтверждением</p>
+    // Пока идёт запрос на покупку — свайп/тап по фону не закрывает
+    // шторку (иначе можно случайно уйти со экрана посреди списания
+    // средств, а результат придёт «в пустоту»).
+    <SheetOverlay onDismiss={loading ? () => {} : undefined}>
+      <h1 className="sheet__title">Подтвердить покупку</h1>
+      <p className="sheet__subtitle">Проверьте данные перед подтверждением</p>
 
-        <div className="sheet-product">
-          <ProductImage product={product} />
-          <div className="sheet-product__body">
-            <span className="sheet-product__title">{product.title}</span>
-            <span className="sheet-product__subtitle">
-              {(isAccount ? [product.geo, product.type] : [product.platform, product.type])
-                .filter(Boolean)
-                .join(' · ')}
-            </span>
-          </div>
-          <span className="sheet-product__price">${product.price.toFixed(2)}</span>
+      <div className="sheet-product">
+        <ProductImage product={product} />
+        <div className="sheet-product__body">
+          <span className="sheet-product__title">{product.title}</span>
+          <span className="sheet-product__subtitle">
+            {(isAccount
+              ? [product.geoFlag, product.geo, product.platform]
+              : [product.platform, product.type]
+            )
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
         </div>
-
-        {isAccount && (
-          <>
-            <div className="qty-row">
-              <span>Количество</span>
-              <span className="qty-row__available">Доступно: {product.stock}</span>
-            </div>
-            <div className="qty-control">
-              <button onClick={() => setQty((q) => Math.min(product.stock, q + 1))}>+</button>
-              <span>{qty}</span>
-              <button onClick={() => setQty((q) => Math.max(1, q - 1))}>−</button>
-            </div>
-          </>
-        )}
-
-        <div className="detail-list detail-list--flat">
-          <div className="detail-list__row">
-            <span>Ваш баланс</span>
-            <span>${balance.toFixed(2)}</span>
-          </div>
-          {isAccount && (
-            <div className="detail-list__row">
-              <span>Цена за 1 шт.</span>
-              <span>${product.price.toFixed(2)}</span>
-            </div>
-          )}
-          <div className="detail-list__row">
-            <span>Будет списано</span>
-            <span className="detail-list__accent">${total.toFixed(2)}</span>
-          </div>
-        </div>
-
-        <div className="sheet-remaining">
-          <span>Остаётся на балансе</span>
-          <span>${Math.max(remaining, 0).toFixed(2)}</span>
-        </div>
-
-        <button className="btn btn--primary btn--block" onClick={handleConfirm} disabled={loading}>
-          {loading ? <LoaderCompact /> : `Подтвердить за $${total.toFixed(2)}`}
-        </button>
-        <button className="btn btn--ghost btn--block" onClick={() => navigate(-1)} disabled={loading}>
-          Отменить
-        </button>
+        <span className="sheet-product__price">${product.price.toFixed(2)}</span>
       </div>
-    </Screen>
+
+      {isAccount && (
+        <>
+          <div className="qty-row">
+            <span>Количество</span>
+            <span className="qty-row__available">Доступно: {product.stock}</span>
+          </div>
+          <div className="qty-control">
+            <button onClick={() => setQty((q) => Math.min(product.stock, q + 1))}>+</button>
+            <span>{qty}</span>
+            <button onClick={() => setQty((q) => Math.max(1, q - 1))}>−</button>
+          </div>
+        </>
+      )}
+
+      <div className="detail-list detail-list--flat">
+        <div className="detail-list__row">
+          <span>Ваш баланс</span>
+          <span>${balance.toFixed(2)}</span>
+        </div>
+        {isAccount && (
+          <div className="detail-list__row">
+            <span>Цена за 1 шт.</span>
+            <span>${product.price.toFixed(2)}</span>
+          </div>
+        )}
+        <div className="detail-list__row">
+          <span>Будет списано</span>
+          <span className="detail-list__accent">${total.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div className="sheet-remaining">
+        <span>Остаётся на балансе</span>
+        <span>${Math.max(remaining, 0).toFixed(2)}</span>
+      </div>
+
+      <button className="btn btn--primary btn--block" onClick={handleConfirm} disabled={loading}>
+        {loading ? <LoaderCompact /> : `Подтвердить за $${total.toFixed(2)}`}
+      </button>
+      <button className="btn btn--ghost btn--block" onClick={() => navigate(-1)} disabled={loading}>
+        Отменить
+      </button>
+    </SheetOverlay>
   );
 }

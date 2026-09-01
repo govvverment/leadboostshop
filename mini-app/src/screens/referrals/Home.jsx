@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import Screen from '../../components/Screen';
 import EmptyState from '../../components/EmptyState';
 import LetterAvatar from '../../components/LetterAvatar';
+import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useTelegramUser } from '../../hooks/useTelegramUser';
 import { config } from '../../config';
@@ -40,7 +41,7 @@ export default function ReferralsHome() {
         <div className="referral-card__link-row">
           <span className="referral-card__link">{myLink}</span>
           <button className="referral-card__copy" onClick={copyLink} aria-label="Копировать">
-            ⧉
+            <Icon name="copy" size={16} />
           </button>
         </div>
       </div>
@@ -69,9 +70,9 @@ export default function ReferralsHome() {
       {referral.list.length === 0 ? (
         <EmptyState icon="👥" title="Рефералов пока нет" subtitle="Поделитесь ссылкой, чтобы пригласить друзей" />
       ) : (
-        <div className="list">
+        <div className="referral-group">
           {referral.list.slice(0, 2).map((r, i) => (
-            <div key={`${r.username}-${i}`} className="list-row list-row--static">
+            <div key={`${r.username}-${i}`} className="referral-group__row">
               <LetterAvatar name={r.username} />
               <div className="list-row__body">
                 <span className="list-row__title">{r.username}</span>

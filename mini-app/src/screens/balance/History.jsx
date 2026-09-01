@@ -2,9 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import Screen from '../../components/Screen';
 import EmptyState from '../../components/EmptyState';
+import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 
-const ICONS = { deposit: '↓', purchase: '🛍', subscription: '</>', referral: '👥' };
+const ICONS = { deposit: 'download', purchase: 'bag', subscription: 'code', referral: 'people' };
 
 function isSameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -83,7 +84,7 @@ export default function BalanceHistory() {
               {g.items.map((h) => (
                 <div key={h.id} className="history-row">
                   <span className={'history-row__icon' + (h.amount > 0 ? ' history-row__icon--success' : '')}>
-                    {ICONS[h.type] ?? '•'}
+                    <Icon name={ICONS[h.type] ?? 'bag'} size={16} />
                   </span>
                   <div className="list-row__body">
                     <span className="list-row__title">{h.title}</span>

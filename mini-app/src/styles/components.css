@@ -6,6 +6,7 @@
   max-width: 480px;
   margin: 0 auto;
   background: var(--bg);
+  transition: background-color 0.2s ease;
 }
 
 .screen__content {
@@ -29,10 +30,11 @@
   justify-content: space-between;
   padding-left: 16px;
   padding-right: 16px;
-  background: rgba(10, 10, 15, 0.86);
+  background: var(--header-bg);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
   z-index: 50;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .app-header__logo {
@@ -53,13 +55,54 @@
   font-size: 16px;
 }
 
+.app-header__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .app-header__support {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text-secondary);
   font-size: 13px;
   padding: 7px 12px;
   border-radius: var(--radius-pill);
+}
+
+/* Тумблер тёмная/светлая тема — в хедере, перед кнопкой поддержки */
+.theme-toggle {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.theme-toggle.is-light {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.theme-toggle__thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform 0.18s ease, background-color 0.15s ease;
+}
+
+.theme-toggle.is-light .theme-toggle__thumb {
+  background: var(--accent);
+  transform: translateX(18px);
 }
 
 /* ===== Bottom nav ===== */
@@ -69,10 +112,11 @@
   width: 100%;
   display: flex;
   padding: 8px 8px calc(10px + var(--safe-bottom));
-  background: rgba(12, 12, 18, 0.92);
+  background: var(--bottom-nav-bg);
   backdrop-filter: blur(14px);
   border-top: 1px solid var(--border);
   z-index: 50;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .bottom-nav__item {
@@ -240,6 +284,18 @@
   justify-content: center;
   font-size: 18px;
   color: var(--text-secondary);
+}
+
+.empty-state__icon--square {
+  border-radius: var(--radius-md);
+  width: 52px;
+  height: 52px;
+}
+
+.error-state__icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-weight: 700;
   margin-bottom: 6px;
 }
 
@@ -251,7 +307,8 @@
   margin: 0;
 }
 
-.empty-state__subtitle {
+.empty-state__subtitle,
+.error-state__subtitle {
   font-size: 13px;
   margin: 0 0 8px;
   max-width: 260px;
@@ -267,7 +324,7 @@
   border: 1px solid var(--border);
   color: var(--text-primary);
   padding: 10px 16px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-pill);
   font-size: 13px;
   font-weight: 500;
   display: flex;
@@ -505,7 +562,29 @@
   color: var(--accent);
 }
 
+/* Чипы-дропдауны (GEO / Тип / Соцсеть) содержат текст + стрелочку рядом —
+   без этого блока кнопка не была flex-контейнером, а SVG-стрелочка
+   (.filter-chip__chevron) рендерилась без размеров браузером "как есть"
+   (сотни пикселей) — из-за этого весь ряд фильтров разъезжался. */
+.filter-chip--icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.filter-chip__chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 .filter-bar {
+  position: relative;
+}
+
+/* Обёртка чипа-дропдауна (GEO / Тип) в CategoryList.jsx — меню выпадает
+   строго под своим чипом, а не под левым краем всей панели фильтров. */
+.filter-dropdown {
   position: relative;
 }
 
@@ -797,33 +876,6 @@
   margin: -6px 0 4px;
 }
 
-.payment-alert {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  margin: 0 0 16px;
-  border: 1px solid rgba(228, 84, 94, 0.42);
-  border-radius: 8px;
-  background: var(--danger-soft);
-  color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.payment-alert__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 22px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(228, 84, 94, 0.16);
-  color: var(--danger);
-  font-weight: 800;
-}
-
 .result-screen {
   display: flex;
   flex-direction: column;
@@ -855,7 +907,7 @@
 }
 
 .result-screen__icon--warning {
-  background: rgba(255, 181, 71, 0.14);
+  background: var(--warning-soft);
   color: var(--warning);
 }
 
@@ -990,8 +1042,8 @@
 }
 
 .tab.is-active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* ===== Generic list ===== */
@@ -1025,10 +1077,12 @@
   min-width: 0;
 }
 
-/* Когда тело строки — прямой ребёнок .list-row (не вложено в
-   .list-row__top, как у "высоких" карточек покупок) — растягиваем
-   его, чтобы аватар был вплотную к имени, а сумма прижата к краю. */
-.list-row > .list-row__body {
+/* Когда тело строки — прямой ребёнок .list-row или .referral-group__row
+   (не вложено в .list-row__top, как у "высоких" карточек покупок) —
+   растягиваем его, чтобы аватар был вплотную к имени, а сумма прижата
+   к краю. */
+.list-row > .list-row__body,
+.referral-group__row > .list-row__body {
   flex: 1;
 }
 
@@ -1153,24 +1207,34 @@
   color: var(--text-tertiary);
 }
 
+/* Один общий контур вместо отдельной карточки на каждый пункт —
+   строки разделены линией внутри, как в макете. */
 .menu-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0 14px;
 }
 
 .menu-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 14px 0;
   text-align: left;
   color: var(--text-primary);
   font-size: 14px;
   font-weight: 500;
+  width: 100%;
+}
+.menu-row:last-child {
+  border-bottom: none;
 }
 
 .menu-row__value {
@@ -1544,19 +1608,100 @@
   color: var(--text-tertiary);
 }
 
+/* "Доступ к товару" — общий паттерн для разовых покупок и подписок:
+   строка-лейбл + действие (открыть/скачать/копировать) справа. */
+.access-row__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.access-row__icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+.access-row__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 1px;
+}
+
 /* Bottom sheet style (confirmation / result screens) */
+/* Модалка снизу — фон-затемнение на весь экран, сама шторка высотой
+   по контенту (max-height как страховка от слишком длинного контента,
+   не фиксированная доля экрана). */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(4, 5, 9, 0.7);
+  animation: sheet-backdrop-in 0.2s ease;
+}
+@keyframes sheet-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-overlay,
+  .sheet {
+    animation: none;
+  }
+}
+
 .sheet {
-  padding-top: 4px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border-radius: 22px 22px 0 0;
+  padding: 20px 20px calc(20px + var(--safe-bottom));
+  animation: sheet-slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  /* Плавный "снэп" обратно на место, если свайп вниз не дотянул до
+     порога закрытия — см. SheetOverlay.jsx. */
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* Во время самого свайпа transition выключаем — шторка должна следовать
+   за пальцем без задержки, "снэп" нужен только на отпускании. */
+.sheet--dragging {
+  transition: none;
 }
 .sheet--center {
   text-align: center;
+}
+/* Зона захвата под свайп-вниз — заметно больше самой видимой "ручки"
+   (серой полоски), чтобы за неё было легко попасть пальцем. touch-action:
+   none — чтобы браузер не пытался сам проскроллить страницу вместо
+   нашего жеста. */
+.sheet__handle-zone {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 18px;
+  margin: 0 -20px;
+  touch-action: none;
+  cursor: grab;
 }
 .sheet__handle {
   width: 36px;
   height: 4px;
   border-radius: var(--radius-pill);
   background: var(--border);
-  margin: 0 auto 18px;
 }
 .sheet__title {
   font-family: var(--font-display);
@@ -1712,6 +1857,10 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+.file-card__icon svg {
+  width: 18px;
+  height: 18px;
 }
 .file-card__body {
   display: flex;
@@ -1888,8 +2037,9 @@ img.qr-card__code {
   background: none;
   border: none;
   color: var(--text-primary);
-  font-weight: 600;
-  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 .waiting-row {
   display: flex;
@@ -1971,8 +2121,8 @@ img.qr-card__code {
   width: 34px;
   height: 34px;
   border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-secondary);
+  background: var(--accent-soft);
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2031,11 +2181,17 @@ img.qr-card__code {
   color: var(--text-tertiary);
 }
 .menu-row__icon {
-  font-size: 16px;
   width: 20px;
-  text-align: center;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-secondary);
   flex-shrink: 0;
+}
+.menu-row__icon svg {
+  width: 18px;
+  height: 18px;
 }
 .menu-row__label {
   flex: 1;
@@ -2073,7 +2229,8 @@ img.qr-card__code {
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 14px;
+  display: flex;
+  align-items: center;
 }
 .letter-avatar {
   border-radius: 50%;
@@ -2100,6 +2257,26 @@ img.qr-card__code {
 .referral-summary-row__amount {
   color: var(--success);
   font-weight: 700;
+}
+
+/* Список рефералов — одна карточка с разделителями между строками
+   (не отдельная карточка на каждого реферала). */
+.referral-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 4px 14px;
+  margin-bottom: 16px;
+}
+.referral-group__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.referral-group__row:last-child {
+  border-bottom: none;
 }
 
 /* Tall list rows (purchases combined list) */
@@ -2143,6 +2320,14 @@ img.qr-card__code {
 .btn--danger-outline {
   background: none;
   color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+/* Безвозвратное удаление — заливкой, чтобы визуально отличаться от
+   архивации (btn--danger-outline), которую можно отменить. */
+.btn--danger {
+  background: var(--danger);
+  color: #fff;
   border: 1px solid var(--danger);
 }
 

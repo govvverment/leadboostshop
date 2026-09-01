@@ -70,6 +70,7 @@ export const adminApi = {
   updateProduct: (id, payload) => callFunction('admin-products', { action: 'update', id, ...payload }),
   archiveProduct: (id) => callFunction('admin-products', { action: 'archive', id }),
   restoreProduct: (id) => callFunction('admin-products', { action: 'restore', id }),
+  deleteProduct: (id) => callFunction('admin-products', { action: 'delete', id }),
   uploadImage: (file) => {
     const form = new FormData();
     form.append('image', file);

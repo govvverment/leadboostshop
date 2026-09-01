@@ -5,6 +5,8 @@
   --surface-2: #171a23;
   --border: #222732;
 
+  /* Фиолетовый — фирменный цвет кнопок и акцентов, одинаковый в обеих
+     темах (см. --accent* ниже — они НЕ переопределяются в светлой теме). */
   --accent: #5440aa;
   --accent-hover: #6650c2;
   --accent-soft: #211b3d;
@@ -14,10 +16,16 @@
   --danger: #e4545e;
   --danger-soft: #2a171b;
   --warning: #ffb547;
+  --warning-soft: rgba(255, 181, 71, 0.14);
 
   --text-primary: #f5f7fa;
   --text-secondary: #a4a6ac;
   --text-tertiary: #5f6672;
+
+  /* Полупрозрачные фоны хедера и нижнего меню (blur-подложка) — цвет
+     тоже зависит от темы, поэтому вынесены в переменные. */
+  --header-bg: rgba(10, 10, 15, 0.86);
+  --bottom-nav-bg: rgba(12, 12, 18, 0.92);
 
   --radius-sm: 10px;
   --radius-md: 16px;
@@ -29,6 +37,31 @@
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Светлая тема — включается тумблером в хедере (см. ThemeContext),
+   применяется через [data-theme="light"] на <html>. Фиолетовый акцент
+   (--accent/--accent-hover) сознательно НЕ трогаем — кнопки остаются
+   такими же фиолетовыми, как в тёмной теме. */
+[data-theme='light'] {
+  --bg: #f5f6fa;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #eef0f5;
+  --border: #e1e4ea;
+
+  --accent-soft: #ece8fb;
+
+  --success-soft: #e2f8ec;
+  --danger-soft: #fde9eb;
+  --warning-soft: rgba(255, 181, 71, 0.18);
+
+  --text-primary: #14151a;
+  --text-secondary: #5b5f6a;
+  --text-tertiary: #93969f;
+
+  --header-bg: rgba(255, 255, 255, 0.86);
+  --bottom-nav-bg: rgba(255, 255, 255, 0.92);
 }
 
 * {
@@ -45,6 +78,7 @@ html, body {
   /* Блокируем зум (pinch/двойной тап) — на части iOS-версий мета-тег
      viewport один это не гарантирует. */
   touch-action: pan-x pan-y;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #root {

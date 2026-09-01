@@ -27,9 +27,9 @@ export default function ReferralsAll() {
       {referral.list.length === 0 ? (
         <EmptyState icon="👥" title="Рефералов пока нет" subtitle="Поделитесь ссылкой, чтобы пригласить друзей" />
       ) : (
-        <div className="list">
+        <div className="referral-group">
           {referral.list.map((r, i) => (
-            <div key={`${r.username}-${i}`} className="list-row list-row--static">
+            <div key={`${r.username}-${i}`} className="referral-group__row">
               <LetterAvatar name={r.username} />
               <div className="list-row__body">
                 <span className="list-row__title">{r.username}</span>

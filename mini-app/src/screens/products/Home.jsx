@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Screen from '../../components/Screen';
-import ProductCard from '../../components/ProductCard';
 import ProductIcon from '../../components/ProductIcon';
 import ProductImage from '../../components/ProductImage';
 import { useApp } from '../../context/AppContext';
@@ -35,11 +34,6 @@ export default function ProductsHome() {
   const [query, setQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const blurTimeout = useRef(null);
-
-  // Живые данные вместо жёстко зашитого списка ID — так новые товары,
-  // добавленные в админке, сразу появляются на главной.
-  const newArrivals = products.slice(0, 4);
-  const popular = [...products].sort((a, b) => (b.salesCount ?? 0) - (a.salesCount ?? 0)).slice(0, 4);
 
   const showDropdown = isFocused && query.trim().length > 0;
   const results = showDropdown
@@ -124,7 +118,7 @@ export default function ProductsHome() {
                 <div className="news-item__body">
                   <span className="news-item__title">{r.title}</span>
                   <span className="news-item__meta">
-                    {[r.geo, r.type, `Пополнено ${timeAgo(r.restockedAt)}`].filter(Boolean).join(' · ')}
+                    {[r.geo, `Пополнено ${timeAgo(r.restockedAt)}`].filter(Boolean).join(' · ')}
                   </span>
                 </div>
                 <span className="news-item__delta">+{r.qtyAdded} шт.</span>
@@ -156,43 +150,6 @@ export default function ProductsHome() {
           })}
         </div>
       </div>
-
-      {newArrivals.length > 0 && (
-      <div className="section">
-        <h2 className="section__title">Новинки</h2>
-        <div className="carousel">
-          {newArrivals.map((p) => (
-            <button key={p.id} className="carousel-card" onClick={() => navigate(`/product/${p.id}`)}>
-              <ProductImage product={p} size={40} />
-              <span className="carousel-card__title">{p.title}</span>
-              <span className={'badge' + (p.kind === 'subscription' ? ' badge--accent' : p.kind === 'one-time' ? ' badge--success' : ' badge--muted')}>
-                {p.kind === 'subscription' ? 'Подписка' : p.kind === 'one-time' ? 'Разовая покупка' : ''}
-              </span>
-              <span className="carousel-card__price">
-                ${p.price.toFixed(2)}
-                {p.period && ` / ${p.period}`}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-      )}
-
-      {popular.length > 0 && (
-      <div className="section">
-        <div className="section__head">
-          <h2 className="section__title">Популярное</h2>
-          <button className="link-button" onClick={() => navigate('/products/accounts')}>
-            Все →
-          </button>
-        </div>
-        <div className="product-list">
-          {popular.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
-      </div>
-      )}
     </Screen>
   );
 }

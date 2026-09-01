@@ -1,67 +1,72 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 
+// Иконки сверены пиксель-в-пиксель с макетом (Bottom Navigation.png
+// из архива дизайна) — обводка везде, кроме "Рефералы", там в макете
+// иконка залитая (сплошные силуэты), не контурная.
 const ICONS = {
   profile: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="3.6" />
-      <path d="M4.5 20c1.4-4.2 4-6.2 7.5-6.2s6.1 2 7.5 6.2" />
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="9.8" r="2.6" />
+      <path d="M7.4 17.3c1-1.6 2.6-2.4 4.6-2.4s3.6.8 4.6 2.4" />
     </svg>
   ),
   products: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6.5 8h11l-1 12h-9l-1-12z" />
-      <path d="M9 8V6.5a3 3 0 0 1 6 0V8" />
+      <path d="M9 8.2V6.5a3 3 0 0 1 6 0V8.2" />
+      <rect x="5.5" y="8.2" width="13" height="11.8" rx="1.2" />
     </svg>
   ),
   purchases: (
+    // Проверено по чёткому референсу от заказчика: круга НЕТ вообще,
+    // просто галочка вплотную к нижне-правому углу куба, потолще
+    // обычных линий.
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3l8 4.4v9.2L12 21l-8-4.4V7.4L12 3z" />
-      <path d="M4.3 7.6L12 12l7.7-4.4" />
-      <path d="M12 12v9" />
+      <path d="M11.3 3l7.2 4v8L11.3 19l-7.2-4V7l7.2-4z" />
+      <path d="M4.1 7l7.2 4 7.2-4" />
+      <path d="M11.3 11v8" />
+      <path d="M15.5 15.8l1.6 1.6 3-3.4" strokeWidth="2.2" />
     </svg>
   ),
   referrals: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="8.2" r="3" />
-      <path d="M3 20c1-3.3 3-5.2 6-5.2s5 1.9 6 5.2" />
-      <circle cx="17.2" cy="9" r="2.3" />
-      <path d="M15.8 12.1c2.3.3 3.6 1.9 4.2 4" />
+    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <circle cx="12" cy="9.3" r="3" />
+      <ellipse cx="12" cy="18.2" rx="6" ry="3.2" />
+      <circle cx="5.3" cy="9.8" r="2" opacity="0.55" />
+      <ellipse cx="4" cy="18.6" rx="3" ry="2.6" opacity="0.55" />
+      <circle cx="18.7" cy="9.8" r="2" opacity="0.55" />
+      <ellipse cx="20" cy="18.6" rx="3" ry="2.6" opacity="0.55" />
     </svg>
   ),
 };
 
-// У некоторых разделов есть "дочерние" экраны с другим префиксом пути
-// (например, карточка товара — /product/:id, а не /products/...), поэтому
-// одного React Router isActive (сравнение с `to`) недостаточно — заводим
-// список путей, которые тоже должны подсвечивать пункт меню.
 const items = [
-  { to: '/profile', label: 'Профиль', icon: 'profile', match: ['/profile'] },
-  { to: '/products', label: 'Товары', icon: 'products', match: ['/products', '/product'] },
-  { to: '/purchases', label: 'Покупки', icon: 'purchases', match: ['/purchases', '/subscriptions'] },
-  { to: '/referrals', label: 'Рефералы', icon: 'referrals', match: ['/referrals'] },
+  { to: '/profile', label: 'Профиль', icon: 'profile' },
+  { to: '/products', label: 'Товары', icon: 'products' },
+  { to: '/purchases', label: 'Покупки', icon: 'purchases' },
+  { to: '/referrals', label: 'Рефералы', icon: 'referrals' },
 ];
 
-function isItemActive(pathname, patterns) {
-  return patterns.some((path) => pathname === path || pathname.startsWith(path + '/'));
-}
-
 export default function BottomNav() {
-  const { pathname } = useLocation();
-
   return (
     <nav className="bottom-nav">
-      {items.map((item) => {
-        const isActive = isItemActive(pathname, item.match);
-        return (
-          <NavLink key={item.to} to={item.to} className={'bottom-nav__item' + (isActive ? ' is-active' : '')}>
-            <span className="bottom-nav__icon" aria-hidden="true">
-              {ICONS[item.icon]}
-            </span>
-            <span className="bottom-nav__label">{item.label}</span>
-            {isActive && <span className="bottom-nav__indicator" />}
-          </NavLink>
-        );
-      })}
+      {items.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          className={({ isActive }) => 'bottom-nav__item' + (isActive ? ' is-active' : '')}
+        >
+          {({ isActive }) => (
+            <>
+              <span className="bottom-nav__icon" aria-hidden="true">
+                {ICONS[item.icon]}
+              </span>
+              <span className="bottom-nav__label">{item.label}</span>
+              {isActive && <span className="bottom-nav__indicator" />}
+            </>
+          )}
+        </NavLink>
+      ))}
     </nav>
   );
 }

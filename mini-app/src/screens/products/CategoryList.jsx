@@ -11,6 +11,26 @@ const KIND_FILTERS = [
   { id: 'one-time', label: 'Разово' },
 ];
 
+// Стрелочка для чипов-дропдаунов (GEO / Тип) — раньше был символ "⌄",
+// но в разных шрифтах/платформах у него разная высота и он "плыл"
+// относительно текста. SVG-иконка всегда выравнивается одинаково.
+function ChevronIcon() {
+  return (
+    <svg
+      className="filter-chip__chevron"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 export default function CategoryList() {
   const { categoryId } = useParams();
   const { products, categories } = useApp();
@@ -18,7 +38,9 @@ export default function CategoryList() {
   const [query, setQuery] = useState('');
   const [kindFilter, setKindFilter] = useState('all'); // категории без GEO (решения/подписки)
   const [geoFilter, setGeoFilter] = useState('all'); // категории с GEO (аккаунты)
-  const [geoOpen, setGeoOpen] = useState(false);
+  const [networkFilter, setNetworkFilter] = useState('all'); // соцсеть (Instagram/Facebook/...)
+  const [typeFilter, setTypeFilter] = useState('all'); // тип аккаунта (Autorer/Aged/...)
+  const [openFilter, setOpenFilter] = useState(null); // null | 'geo' | 'network' | 'type' — какой дропдаун открыт
   const filterBarRef = useRef(null);
 
   const title = categories.find((c) => c.id === categoryId)?.title ?? 'Товары';
@@ -33,19 +55,34 @@ export default function CategoryList() {
     return Array.from(new Set(items.map((p) => p.geo).filter(Boolean))).sort();
   }, [items, hasGeo]);
 
+  const networkOptions = useMemo(() => {
+    if (!hasGeo) return [];
+    return Array.from(new Set(items.map((p) => p.network).filter(Boolean))).sort();
+  }, [items, hasGeo]);
+
+  const typeOptions = useMemo(() => {
+    if (!hasGeo) return [];
+    return Array.from(new Set(items.map((p) => p.type).filter(Boolean))).sort();
+  }, [items, hasGeo]);
+
   useEffect(() => {
-    if (!geoOpen) return;
+    if (!openFilter) return;
     const handleOutsideClick = (e) => {
-      if (filterBarRef.current && !filterBarRef.current.contains(e.target)) setGeoOpen(false);
+      if (filterBarRef.current && !filterBarRef.current.contains(e.target)) setOpenFilter(null);
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [geoOpen]);
+  }, [openFilter]);
 
   const filtered = items.filter((p) => {
     const matchesQuery = p.title.toLowerCase().startsWith(query.trim().toLowerCase());
     if (hasGeo) {
-      return matchesQuery && (geoFilter === 'all' || p.geo === geoFilter);
+      return (
+        matchesQuery &&
+        (geoFilter === 'all' || p.geo === geoFilter) &&
+        (networkFilter === 'all' || p.network === networkFilter) &&
+        (typeFilter === 'all' || p.type === typeFilter)
+      );
     }
     return matchesQuery && (kindFilter === 'all' || p.kind === kindFilter);
   });
@@ -72,16 +109,103 @@ export default function CategoryList() {
       <div className="filter-bar" ref={filterBarRef}>
         {hasGeo ? (
           <div className="filter-row">
-            <button className={'filter-chip' + (geoFilter === 'all' ? ' is-active' : '')} onClick={() => setGeoFilter('all')}>
+            <button
+              className={
+                'filter-chip' +
+                (geoFilter === 'all' && networkFilter === 'all' && typeFilter === 'all' ? ' is-active' : '')
+              }
+              onClick={() => {
+                setGeoFilter('all');
+                setNetworkFilter('all');
+                setTypeFilter('all');
+                setOpenFilter(null);
+              }}
+            >
               Все
             </button>
+
             {geoOptions.length > 0 && (
-              <button
-                className={'filter-chip' + (geoFilter !== 'all' ? ' is-active' : '')}
-                onClick={() => setGeoOpen((v) => !v)}
-              >
-                {geoFilter === 'all' ? 'GEO' : geoFilter} ⌄
-              </button>
+              <div className="filter-dropdown">
+                <button
+                  className={'filter-chip filter-chip--icon' + (geoFilter !== 'all' ? ' is-active' : '')}
+                  onClick={() => setOpenFilter((v) => (v === 'geo' ? null : 'geo'))}
+                >
+                  <span>{geoFilter === 'all' ? 'GEO' : geoFilter}</span>
+                  <ChevronIcon />
+                </button>
+                {openFilter === 'geo' && (
+                  <div className="filter-dropdown__menu">
+                    {geoOptions.map((g) => (
+                      <button
+                        key={g}
+                        className={'filter-dropdown__item' + (geoFilter === g ? ' is-active' : '')}
+                        onClick={() => {
+                          setGeoFilter(g);
+                          setOpenFilter(null);
+                        }}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {networkOptions.length > 0 && (
+              <div className="filter-dropdown">
+                <button
+                  className={'filter-chip filter-chip--icon' + (networkFilter !== 'all' ? ' is-active' : '')}
+                  onClick={() => setOpenFilter((v) => (v === 'network' ? null : 'network'))}
+                >
+                  <span>{networkFilter === 'all' ? 'Соцсеть' : networkFilter}</span>
+                  <ChevronIcon />
+                </button>
+                {openFilter === 'network' && (
+                  <div className="filter-dropdown__menu">
+                    {networkOptions.map((n) => (
+                      <button
+                        key={n}
+                        className={'filter-dropdown__item' + (networkFilter === n ? ' is-active' : '')}
+                        onClick={() => {
+                          setNetworkFilter(n);
+                          setOpenFilter(null);
+                        }}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {typeOptions.length > 0 && (
+              <div className="filter-dropdown">
+                <button
+                  className={'filter-chip filter-chip--icon' + (typeFilter !== 'all' ? ' is-active' : '')}
+                  onClick={() => setOpenFilter((v) => (v === 'type' ? null : 'type'))}
+                >
+                  <span>{typeFilter === 'all' ? 'Тип аккаунта' : typeFilter}</span>
+                  <ChevronIcon />
+                </button>
+                {openFilter === 'type' && (
+                  <div className="filter-dropdown__menu">
+                    {typeOptions.map((t) => (
+                      <button
+                        key={t}
+                        className={'filter-dropdown__item' + (typeFilter === t ? ' is-active' : '')}
+                        onClick={() => {
+                          setTypeFilter(t);
+                          setOpenFilter(null);
+                        }}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         ) : (
@@ -93,23 +217,6 @@ export default function CategoryList() {
                 onClick={() => setKindFilter(f.id)}
               >
                 {f.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {geoOpen && (
-          <div className="filter-dropdown__menu">
-            {geoOptions.map((g) => (
-              <button
-                key={g}
-                className={'filter-dropdown__item' + (geoFilter === g ? ' is-active' : '')}
-                onClick={() => {
-                  setGeoFilter(g);
-                  setGeoOpen(false);
-                }}
-              >
-                {g}
               </button>
             ))}
           </div>

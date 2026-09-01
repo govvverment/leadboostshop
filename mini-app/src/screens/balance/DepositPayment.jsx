@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import Screen from '../../components/Screen';
+import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 
 const POLL_INTERVAL_MS = 5000;
@@ -125,12 +126,7 @@ export default function DepositPayment() {
         <h1 className="page-head__title">Оплата</h1>
       </div>
 
-      {error && (
-        <div className="payment-alert" role="alert">
-          <span className="payment-alert__icon" aria-hidden="true">!</span>
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <p className="confirm-sheet__warning">{error}</p>}
 
       {!request && !error ? (
         <p className="hint-text">Создаём заявку на оплату...</p>
@@ -159,7 +155,7 @@ export default function DepositPayment() {
                 {request.walletAddress}
               </span>
               <button className="address-row__copy" onClick={() => copyText(request.walletAddress)} aria-label="Копировать адрес">
-                ⧉
+                <Icon name="copy" size={16} />
               </button>
             </div>
           </div>

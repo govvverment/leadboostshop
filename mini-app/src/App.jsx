@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
+import { ThemeProvider } from './context/ThemeContext';
 import Toast from './components/Toast';
 import ScrollToTop from './components/ScrollToTop';
 
@@ -38,6 +39,7 @@ import AdminCategories from './admin/screens/AdminCategories';
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AppProvider>
       <AdminAuthProvider>
       <ScrollToTop />
@@ -125,5 +127,6 @@ export default function App() {
       <Toast />
       </AdminAuthProvider>
     </AppProvider>
+    </ThemeProvider>
   );
 }
