@@ -1328,12 +1328,21 @@
   font-size: 14px;
 }
 
-/* Product icon glyph (legacy base, superseded by .product-icon-img) */
-.product-icon-img {
-  border-radius: var(--radius-sm);
-  display: block;
+/* Заглушка-иконка товара/категории без своей картинки — фиолетовый
+   акцентный фон + SVG-глиф на currentColor, подстраивается под тему. */
+.product-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  transition: background-color 0.2s ease;
+}
+.product-icon svg {
+  width: 55%;
+  height: 55%;
 }
 
 /* Product image (real photo from backend), with loading skeleton */
@@ -1502,10 +1511,6 @@
   align-items: flex-start;
   gap: 12px;
   margin-bottom: 18px;
-}
-.product-detail__icon .product-icon-img {
-  width: 48px;
-  height: 48px;
 }
 .product-detail__meta {
   display: flex;
