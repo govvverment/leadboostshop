@@ -1,9 +1,46 @@
+import { Image } from 'https://deno.land/x/imagescript@1.3.0/mod.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import { corsHeaders, withCors } from '../_shared/cors.ts';
 import { requireAdminSession } from '../_shared/adminAuth.ts';
 
 // POST { token в заголовке Authorization, action, ...данные }
-// action: 'list' | 'create' | 'update' | 'archive' | 'restore' | 'delete'
+// action: 'list' | 'create' | 'update' | 'archive' | 'restore' | 'delete' |
+//   'optimize-images'
+
+// Та же логика сжатия, что и в admin-upload — но применяется задним
+// числом к уже загруженным картинкам. Сжатие при загрузке (admin-upload)
+// работает только для НОВЫХ файлов; товары/категории, картинки которых
+// были загружены до появления этой логики, остались большими и поэтому
+// заметно медленнее грузятся в приложении (в частности — иконки в
+// "Новостной ленте"). 'optimize-images' один раз проходит по всем уже
+// сохранённым картинкам и пересжимает те, что того стоят.
+const MAX_DIMENSION = 480;
+const JPEG_QUALITY = 82;
+// Файлы легче этого порога уже не переживём — трогать их незачем.
+const OPTIMIZE_SKIP_UNDER_BYTES = 60 * 1024;
+
+async function recompress(
+  bytes: Uint8Array,
+  contentTypeHint: string
+): Promise<{ bytes: Uint8Array; contentType: string; ext: string } | null> {
+  try {
+    const image = await Image.decode(bytes);
+    let resized = false;
+    if (image.width > MAX_DIMENSION || image.height > MAX_DIMENSION) {
+      if (image.width >= image.height) image.resize(MAX_DIMENSION, Image.RESIZE_AUTO);
+      else image.resize(Image.RESIZE_AUTO, MAX_DIMENSION);
+      resized = true;
+    }
+    const isPng = contentTypeHint === 'image/png';
+    const outBytes = isPng ? await image.encode() : await image.encodeJPEG(JPEG_QUALITY);
+    // Не изменили размеры и пересжатая версия не легче оригинала —
+    // пересжимать не имело смысла, оставляем как есть.
+    if (!resized && outBytes.length >= bytes.length) return null;
+    return { bytes: outBytes, contentType: isPng ? 'image/png' : 'image/jpeg', ext: isPng ? 'png' : 'jpg' };
+  } catch {
+    return null; // битый/нераспознанный формат — не трогаем
+  }
+}
 
 function mapProduct(row: Record<string, unknown>) {
   return {
@@ -343,6 +380,75 @@ Deno.serve(async (req) => {
       const { count, error } = await query;
       if (error) return withCors({ error: error.message }, 500);
       return withCors({ removed: count ?? 0 });
+    }
+
+    // Пересжать уже загруженные картинки товаров и категорий (см.
+    // комментарий у recompress() наверху файла). Идём по каждой ссылке
+    // последовательно: скачиваем, при необходимости сжимаем, заливаем
+    // как новый файл в тот же bucket и переключаем image_url в БД на
+    // него. Старый файл в Storage не трогаем (не критично место, зато
+    // исключён риск сломать что-то, что на него ещё смотрит).
+    if (action === 'optimize-images') {
+      const { data: prods, error: prodsError } = await supabase.from('products').select('id, image_url');
+      if (prodsError) return withCors({ error: prodsError.message }, 500);
+      const { data: cats, error: catsError } = await supabase.from('categories').select('id, image_url');
+      if (catsError) return withCors({ error: catsError.message }, 500);
+
+      const targets: { table: 'products' | 'categories'; id: string; url: string }[] = [];
+      for (const p of prods ?? []) if (p.image_url) targets.push({ table: 'products', id: p.id, url: p.image_url });
+      for (const c of cats ?? []) if (c.image_url) targets.push({ table: 'categories', id: c.id, url: c.image_url });
+
+      let optimized = 0;
+      let skipped = 0;
+      let failed = 0;
+      let bytesBefore = 0;
+      let bytesAfter = 0;
+
+      for (const t of targets) {
+        try {
+          const res = await fetch(t.url);
+          if (!res.ok) {
+            failed++;
+            continue;
+          }
+          const contentType = res.headers.get('content-type') || 'image/jpeg';
+          const original = new Uint8Array(await res.arrayBuffer());
+          if (original.length <= OPTIMIZE_SKIP_UNDER_BYTES) {
+            skipped++;
+            continue;
+          }
+
+          const result = await recompress(original, contentType);
+          if (!result) {
+            skipped++;
+            continue;
+          }
+
+          const path = `${crypto.randomUUID()}.${result.ext}`;
+          const { error: upErr } = await supabase.storage
+            .from('product-images')
+            .upload(path, result.bytes, { contentType: result.contentType, cacheControl: '31536000' });
+          if (upErr) {
+            failed++;
+            continue;
+          }
+
+          const { data: pub } = supabase.storage.from('product-images').getPublicUrl(path);
+          const { error: dbErr } = await supabase.from(t.table).update({ image_url: pub.publicUrl }).eq('id', t.id);
+          if (dbErr) {
+            failed++;
+            continue;
+          }
+
+          bytesBefore += original.length;
+          bytesAfter += result.bytes.length;
+          optimized++;
+        } catch {
+          failed++;
+        }
+      }
+
+      return withCors({ total: targets.length, optimized, skipped, failed, bytesBefore, bytesAfter });
     }
 
     // Категории — картинка для карточки на главной. Создаются и
