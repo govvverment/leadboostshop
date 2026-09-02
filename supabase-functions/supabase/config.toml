@@ -445,3 +445,9 @@ verify_jwt = false
 
 [functions.download-purchase-file]
 verify_jwt = false
+
+[functions.admin-upload-account-file]
+verify_jwt = false
+
+[functions.download-account-file]
+verify_jwt = false
