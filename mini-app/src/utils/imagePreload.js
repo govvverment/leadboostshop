@@ -8,11 +8,36 @@
 // завершилось) — не переиспользуется. Blob-URL этой проблемы не имеет:
 // байты один раз реально скачиваются и лежат в памяти, а `<img src>`
 // на них — это уже не сетевой запрос, а мгновенное чтение из памяти.
+// Кеш "оригинальный URL → blob-URL", общий на всё приложение (модульный
+// scope переживает ремонты компонентов/экранов, но не полную перезагрузку
+// страницы). Без него список товаров, который перечитывается заново почти
+// при каждом действии (покупка, возврат на экран и т.п. — см. AppContext),
+// заново скачивал бы одни и те же байты картинок по кругу — именно это и
+// было настоящей причиной того, что "прогрузка фото" не пропадала
+// насовсем: списки товаров вообще не использовали blob-подмену (см. ниже
+// про preloadProductImages), а даже там, где использовали (лента на
+// главной), заново качали то, что уже качали минуту назад.
+const blobCache = new Map();
+
 export function fetchImageAsBlobUrl(url) {
+  if (!url) return Promise.resolve(null);
+  if (blobCache.has(url)) return Promise.resolve(blobCache.get(url));
   return fetch(url)
     .then((res) => (res.ok ? res.blob() : null))
-    .then((blob) => (blob ? URL.createObjectURL(blob) : null))
+    .then((blob) => {
+      if (!blob) return null;
+      const blobUrl = URL.createObjectURL(blob);
+      blobCache.set(url, blobUrl);
+      return blobUrl;
+    })
     .catch(() => null);
+}
+
+// Синхронный доступ к уже готовому blob-URL — чтобы подставить его сразу
+// при рендере (без "иконка → скачалось → фото"), если картинка уже была
+// скачана раньше в этой сессии.
+export function getCachedBlobUrl(url) {
+  return url ? blobCache.get(url) ?? null : null;
 }
 
 // 4с оказалось мало для старых, ещё не сжатых картинок (загруженных до

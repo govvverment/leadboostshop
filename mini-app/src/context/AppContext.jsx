@@ -47,7 +47,7 @@ import {
 import { getTelegramInitData, getUrlRefParam } from '../hooks/useTelegramUser';
 import Screen from '../components/Screen';
 import { LoaderDefault, ErrorState } from '../components/Loader';
-import { preloadToBlobMap } from '../utils/imagePreload';
+import { preloadToBlobMap, getCachedBlobUrl } from '../utils/imagePreload';
 
 const AppContext = createContext(null);
 
@@ -142,7 +142,11 @@ export function AppProvider({ children }) {
         setSubscriptions(snapshot.subscriptions);
         setReferral(snapshot.referral);
         setBalanceHistory(snapshot.balanceHistory);
-        setProducts(freshProducts);
+        // Мгновенно подставляем blob-URL везде, где картинка уже была
+        // скачана раньше в этой сессии (кеш в imagePreload.js) — без
+        // этого список товаров "моргал" бы иконкой-заглушкой, даже если
+        // байты фото уже лежат в памяти после прошлого экрана.
+        setProducts(freshProducts.map((p) => ({ ...p, imageUrl: getCachedBlobUrl(p.imageUrl) || p.imageUrl })));
 
         // Скачиваем байты картинок того, что видно сразу на главной —
         // новостная лента и картинки кастомных категорий (у двух базовых
@@ -160,12 +164,32 @@ export function AppProvider({ children }) {
         setCategories(freshCategories.map((c) => ({ ...c, imageUrl: withBlobUrl(c.imageUrl) })));
         setRestocks(freshRestocks.map((r) => ({ ...r, imageUrl: withBlobUrl(r.imageUrl) })));
 
-        // Превью товаров в поиске не блокируют показ экрана — не так
-        // критично для первого впечатления, греем сетевой кеш в фоне
-        // (без блокирующего скачивания байт, как для ленты выше).
-        freshProducts.slice(0, 12).forEach((p) => {
-          if (p.imageUrl) new Image().src = p.imageUrl;
-        });
+        // Товары (списки внутри категорий, "Все товары" и т.п.) — раньше
+        // здесь просто "прогревали" сетевой кеш через new Image().src, в
+        // расчёте на то, что браузер потом отдаст ту же ссылку из HTTP-
+        // кеша для настоящего <img>. В WebView Телеграма это не
+        // подтверждалось (см. комментарий в imagePreload.js) — тот же кеш
+        // между прогревочным Image() и реальным <img> не переиспользуется.
+        // Именно из-за этого "долгая прогрузка фото" продолжала
+        // всплывать: главный экран (лента, категории) давно грузился
+        // мгновенно через blob-URL, а вот список товаров ВНУТРИ категории
+        // — самый частый экран при обычном использовании — все ещё
+        // тянул картинки по сети заново при каждом заходе. Теперь качаем
+        // по-настоящему, в фоне (не блокируя экран загрузки — товаров
+        // может быть много), и подменяем imageUrl на blob-URL по мере
+        // готовности каждого.
+        if (!cancelled) {
+          const idToUrl = new Map(freshProducts.map((p) => [p.id, p.imageUrl]));
+          preloadToBlobMap(freshProducts.map((p) => p.imageUrl)).then((productBlobMap) => {
+            if (cancelled || productBlobMap.size === 0) return;
+            setProducts((current) =>
+              current.map((p) => {
+                const orig = idToUrl.get(p.id);
+                return orig && productBlobMap.has(orig) ? { ...p, imageUrl: productBlobMap.get(orig) } : p;
+              })
+            );
+          });
+        }
       } catch (err) {
         console.error('Не удалось загрузить данные аккаунта:', err);
         if (!cancelled) setLoadError(err.message || 'Не удалось загрузить данные');
@@ -188,7 +212,22 @@ export function AppProvider({ children }) {
     setSubscriptions(snapshot.subscriptions);
     setReferral(snapshot.referral);
     setBalanceHistory(snapshot.balanceHistory);
-    setProducts(freshProducts);
+
+    // Тот же приём, что и при первой загрузке (см. выше): сразу отдаём
+    // уже скачанные blob-URL из кеша, чтобы список не "мигал" после
+    // каждой покупки/обновления баланса, а недостающие — доскачиваем в
+    // фоне и подставляем по готовности.
+    setProducts(freshProducts.map((p) => ({ ...p, imageUrl: getCachedBlobUrl(p.imageUrl) || p.imageUrl })));
+    const idToUrl = new Map(freshProducts.map((p) => [p.id, p.imageUrl]));
+    preloadToBlobMap(freshProducts.map((p) => p.imageUrl)).then((productBlobMap) => {
+      if (productBlobMap.size === 0) return;
+      setProducts((current) =>
+        current.map((p) => {
+          const orig = idToUrl.get(p.id);
+          return orig && productBlobMap.has(orig) ? { ...p, imageUrl: productBlobMap.get(orig) } : p;
+        })
+      );
+    });
   }, [real]);
 
   // Покупка. В реальном режиме — настоящий запрос к Supabase (Edge
