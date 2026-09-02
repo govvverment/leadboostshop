@@ -451,3 +451,6 @@ verify_jwt = false
 
 [functions.download-account-file]
 verify_jwt = false
+
+[functions.admin-broadcast]
+verify_jwt = false

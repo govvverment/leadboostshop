@@ -45,4 +45,5 @@ jobs:
           supabase functions deploy admin-upload-account-file --project-ref $SUPABASE_PROJECT_ID
           supabase functions deploy download-purchase-file --project-ref $SUPABASE_PROJECT_ID
           supabase functions deploy download-account-file --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy admin-broadcast --project-ref $SUPABASE_PROJECT_ID
           supabase functions deploy bot-webhook --project-ref $SUPABASE_PROJECT_ID

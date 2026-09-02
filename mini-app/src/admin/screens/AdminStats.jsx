@@ -52,6 +52,12 @@ export default function AdminStats() {
           Товары
         </button>
         <button className="tab is-active">Статистика</button>
+        <button className="tab" onClick={() => navigate('/admin/categories')}>
+          Категории
+        </button>
+        <button className="tab" onClick={() => navigate('/admin/broadcast')}>
+          Рассылка
+        </button>
       </div>
 
       {error && <p className="confirm-sheet__warning">{error}</p>}

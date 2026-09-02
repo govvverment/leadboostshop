@@ -104,6 +104,11 @@ export const adminApi = {
   createCategory: (title) => callFunction('admin-products', { action: 'create-category', title }),
   updateCategory: (id, imageUrl) => callFunction('admin-products', { action: 'update-category', id, imageUrl }),
   deleteCategory: (id) => callFunction('admin-products', { action: 'delete-category', id }),
+
+  // Ручная рассылка от бота всем пользователям — ничего не уходит
+  // автоматически, только по явному нажатию в админке.
+  broadcast: ({ text, buttonLabel, productId }) =>
+    callFunction('admin-broadcast', { action: 'send', text, buttonLabel, productId }),
 };
 
 export { AdminApiError };

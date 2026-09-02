@@ -106,6 +106,9 @@ export default function AdminProductsList() {
         <button className="tab" onClick={() => navigate('/admin/categories')}>
           Категории
         </button>
+        <button className="tab" onClick={() => navigate('/admin/broadcast')}>
+          Рассылка
+        </button>
       </div>
 
       <div className="search-bar" style={{ marginBottom: 12 }}>

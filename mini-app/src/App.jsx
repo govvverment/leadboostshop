@@ -36,6 +36,7 @@ import AdminProductForm from './admin/screens/AdminProductForm';
 import AdminInventory from './admin/screens/AdminInventory';
 import AdminStats from './admin/screens/AdminStats';
 import AdminCategories from './admin/screens/AdminCategories';
+import AdminBroadcast from './admin/screens/AdminBroadcast';
 
 export default function App() {
   return (
@@ -118,6 +119,14 @@ export default function App() {
           element={
             <AdminGuard>
               <AdminCategories />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/admin/broadcast"
+          element={
+            <AdminGuard>
+              <AdminBroadcast />
             </AdminGuard>
           }
         />
