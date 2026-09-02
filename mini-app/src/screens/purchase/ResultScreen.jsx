@@ -54,8 +54,8 @@ export default function ResultScreen({ type }) {
             <span className="sheet-product__title">{product.title}</span>
             <span className="sheet-product__subtitle">
               {(product.kind === 'account'
-                ? [product.geoFlag, product.geo, product.platform]
-                : [product.platform, product.type]
+                ? [product.geo, product.type]
+                : [product.type]
               )
                 .filter(Boolean)
                 .join(' · ')}

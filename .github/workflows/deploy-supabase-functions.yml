@@ -1,4 +1,4 @@
-name: Deploy Supabase Functions
+﻿name: Deploy Supabase Functions
 
 on:
   push:
@@ -42,4 +42,7 @@ jobs:
           supabase functions deploy admin-products --project-ref $SUPABASE_PROJECT_ID
           supabase functions deploy admin-stats --project-ref $SUPABASE_PROJECT_ID
           supabase functions deploy admin-upload --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy admin-upload-account-file --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy download-purchase-file --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy download-account-file --project-ref $SUPABASE_PROJECT_ID
           supabase functions deploy bot-webhook --project-ref $SUPABASE_PROJECT_ID

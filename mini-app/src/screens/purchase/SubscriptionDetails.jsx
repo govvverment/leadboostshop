@@ -76,7 +76,6 @@ export default function SubscriptionDetails() {
           {[
             ['Период', sub.periodLabel],
             ['Тип', sub.type],
-            ['Платформа', sub.platform],
           ]
             .filter(([, value]) => Boolean(value))
             .map(([label, value]) => (

@@ -19,6 +19,8 @@ export default function AdminProductsList() {
   const [busyId, setBusyId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [query, setQuery] = useState('');
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimizeResult, setOptimizeResult] = useState(null);
 
   const load = () => {
     adminApi
@@ -64,6 +66,27 @@ export default function AdminProductsList() {
     }
   };
 
+  // Пересжимает задним числом картинки товаров/категорий, загруженные
+  // ДО того, как появилось автосжатие при загрузке (см. admin-upload) —
+  // именно из-за таких "старых" тяжёлых картинок иконки на главной
+  // (в частности в "Новостной ленте") могли грузиться заметно медленнее,
+  // чем всё остальное. Разовое действие, можно жать сколько угодно раз —
+  // уже лёгкие картинки просто пропускаются.
+  const optimizeImages = async () => {
+    setOptimizing(true);
+    setError(null);
+    setOptimizeResult(null);
+    try {
+      const result = await adminApi.optimizeImages();
+      setOptimizeResult(result);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
   const filtered = (products || []).filter((p) => p.title.toLowerCase().includes(query.toLowerCase()));
 
   return (
@@ -98,9 +121,22 @@ export default function AdminProductsList() {
       <button className="btn btn--primary btn--block" onClick={() => navigate('/admin/products/new')}>
         + Добавить товар
       </button>
+      <button className="btn btn--secondary btn--block" onClick={optimizeImages} disabled={optimizing}>
+        {optimizing ? 'Оптимизация фото...' : 'Оптимизировать все фото'}
+      </button>
       <button className="btn btn--ghost btn--block" onClick={logout}>
         Выйти из админки
       </button>
+
+      {optimizeResult && (
+        <p className="hint-text" style={{ marginTop: 10 }}>
+          Готово: обработано {optimizeResult.optimized} из {optimizeResult.total}
+          {optimizeResult.bytesBefore > 0 &&
+            ` (${(optimizeResult.bytesBefore / 1024).toFixed(0)} КБ → ${(optimizeResult.bytesAfter / 1024).toFixed(0)} КБ)`}
+          {optimizeResult.skipped > 0 && `, уже лёгких: ${optimizeResult.skipped}`}
+          {optimizeResult.failed > 0 && `, не удалось: ${optimizeResult.failed}`}
+        </p>
+      )}
 
       {error && <p className="confirm-sheet__warning" style={{ marginTop: 14 }}>{error}</p>}
 

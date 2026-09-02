@@ -22,7 +22,7 @@ export default function ProductCard({ product }) {
         {isAccount ? (
           <>
             <span className="product-row__subtitle">
-              {[product.geoFlag, product.geo, product.platform].filter(Boolean).join(' · ')}
+              {[product.geo, product.type].filter(Boolean).join(' · ')}
             </span>
             {outOfStock ? (
               <span className="badge badge--muted">Нет в наличии</span>
@@ -35,7 +35,7 @@ export default function ProductCard({ product }) {
         ) : (
           <>
             <span className="product-row__subtitle">
-              {[product.platform, product.type].filter(Boolean).join(' · ')}
+              {[product.type].filter(Boolean).join(' · ')}
             </span>
             <span className={'badge' + (product.kind === 'subscription' ? ' badge--accent' : ' badge--success')}>
               {product.kind === 'subscription' ? 'Подписка' : 'Разовая покупка'}

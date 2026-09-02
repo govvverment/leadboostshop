@@ -44,6 +44,11 @@ export default function AdminProductForm() {
   const [categories, setCategories] = useState(null);
   const [inventoryFiles, setInventoryFiles] = useState([]);
   const [inventoryText, setInventoryText] = useState('');
+  // .zip-файлы аккаунтов (второй способ, наравне с TXT выше) — один
+  // zip = один аккаунт. Сами File-объекты храним до сабмита, заливаем
+  // на сервер (uploadAccountFiles) только когда форма реально отправлена.
+  const [inventoryZipFiles, setInventoryZipFiles] = useState([]);
+  const [uploadingZip, setUploadingZip] = useState(false);
 
   useEffect(() => {
     adminApi
@@ -109,6 +114,21 @@ export default function AdminProductForm() {
     }
   };
 
+  // multiple на <input type="file"> и так даёт выделение сразу нескольких
+  // файлов в системном диалоге (на ПК — Ctrl/Shift+клик, на телефоне —
+  // зависит от системного пикера) — отдельного кода под "ПК-версию" не
+  // нужно, само работает одинаково везде.
+  const handleZipFilesSelect = (e) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (!files.length) return;
+    setInventoryZipFiles((prev) => [...prev, ...files]);
+  };
+
+  const removeZipFile = (index) => {
+    setInventoryZipFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -137,10 +157,20 @@ export default function AdminProductForm() {
 
     setSaving(true);
     try {
+      // .zip-склад грузим первым — если загрузка сорвётся, товар вообще
+      // не создаётся (иначе можно было бы получить товар без склада и
+      // потерянные где-то файлы).
+      if (!isEdit && inventoryZipFiles.length > 0) {
+        setUploadingZip(true);
+        const { files } = await adminApi.uploadAccountFiles(inventoryZipFiles);
+        setUploadingZip(false);
+        payload.inventoryFiles = files;
+      }
       if (isEdit) await adminApi.updateProduct(id, payload);
       else await adminApi.createProduct(payload);
       navigate('/admin/products');
     } catch (err) {
+      setUploadingZip(false);
       setError(err.message);
     } finally {
       setSaving(false);
@@ -254,6 +284,46 @@ export default function AdminProductForm() {
           </Field>
         )}
 
+        {!isEdit && form.kind === 'account' && (
+          <Field label="Данные аккаунтов (.zip)">
+            <label className="btn btn--secondary btn--block" style={{ textAlign: 'center' }}>
+              📦 Выбрать ZIP-файлы
+              <input
+                type="file"
+                accept=".zip,application/zip,application/x-zip-compressed"
+                multiple
+                onChange={handleZipFilesSelect}
+                style={{ display: 'none' }}
+              />
+            </label>
+            <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
+              Второй способ, вместе с TXT выше или вместо него — можно выбрать сразу
+              несколько файлов. Один .zip = один аккаунт.
+            </span>
+            {inventoryZipFiles.length > 0 && (
+              <div className="list" style={{ marginTop: 8 }}>
+                {inventoryZipFiles.map((file, i) => (
+                  <div key={`${file.name}-${i}`} className="file-card" style={{ marginBottom: 6 }}>
+                    <span className="file-card__icon">📦</span>
+                    <div className="file-card__body">
+                      <span className="file-card__name">{file.name}</span>
+                      <span className="file-card__meta">{(file.size / 1024).toFixed(0)} KB</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="detail-list__link"
+                      style={{ marginLeft: 'auto' }}
+                      onClick={() => removeZipFile(i)}
+                    >
+                      Убрать
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Field>
+        )}
+
         {form.kind === 'subscription' && (
           <Field label="Период (текстом)">
             <input
@@ -301,9 +371,6 @@ export default function AdminProductForm() {
           </Field>
         )}
 
-        <Field label="Платформа">
-          <input className="text-input" value={form.platform} onChange={(e) => update('platform', e.target.value)} placeholder="Android" />
-        </Field>
         <Field label="Тип">
           <input className="text-input" value={form.type} onChange={(e) => update('type', e.target.value)} placeholder="Autorer" />
         </Field>
@@ -329,7 +396,15 @@ export default function AdminProductForm() {
         </Field>
 
         <button className="btn btn--primary btn--block" type="submit" disabled={saving || uploading}>
-          {saving ? 'Сохранение...' : uploading ? 'Дождитесь загрузки фото...' : isEdit ? 'Сохранить изменения' : 'Добавить товар'}
+          {uploadingZip
+            ? 'Загрузка ZIP-файлов...'
+            : saving
+              ? 'Сохранение...'
+              : uploading
+                ? 'Дождитесь загрузки фото...'
+                : isEdit
+                  ? 'Сохранить изменения'
+                  : 'Добавить товар'}
         </button>
         <button className="btn btn--ghost btn--block" type="button" onClick={() => navigate('/admin/products')}>
           Отмена

@@ -47,8 +47,15 @@ import {
 import { getTelegramInitData, getUrlRefParam } from '../hooks/useTelegramUser';
 import Screen from '../components/Screen';
 import { LoaderDefault, ErrorState } from '../components/Loader';
+import { preloadToBlobMap } from '../utils/imagePreload';
 
 const AppContext = createContext(null);
+
+// Прогрев картинок для того, что видно сразу на главной (новостная лента,
+// кастомные категории) — ждём их ДО того, как убрать экран загрузки, чтобы
+// не было "экран уже открылся, а иконка ещё выскакивает". Реализация —
+// в src/utils/imagePreload.js (переиспользуется и точечно, для одной
+// картинки товара в ConfirmationSheet.jsx — см. комментарий там же).
 
 export function AppProvider({ children }) {
   // "Реальный" режим включается только если открыто внутри настоящего
@@ -136,8 +143,29 @@ export function AppProvider({ children }) {
         setReferral(snapshot.referral);
         setBalanceHistory(snapshot.balanceHistory);
         setProducts(freshProducts);
-        setCategories(freshCategories);
-        setRestocks(freshRestocks);
+
+        // Скачиваем байты картинок того, что видно сразу на главной —
+        // новостная лента и картинки кастомных категорий (у двух базовых
+        // категорий теперь встроенная SVG-иконка, грузить с сервера
+        // нечего) — и подменяем их imageUrl на локальный blob:-URL ДО
+        // того, как эти данные вообще попадут в state. Экран загрузки не
+        // убираем, пока это не готово (либо не истёк таймаут) — именно
+        // поэтому иконки должны появляться сразу, без "выскакивания".
+        const blobMap = cancelled
+          ? new Map()
+          : await preloadToBlobMap([...freshCategories.map((c) => c.imageUrl), ...freshRestocks.map((r) => r.imageUrl)]);
+        if (cancelled) return;
+
+        const withBlobUrl = (imageUrl) => (imageUrl && blobMap.has(imageUrl) ? blobMap.get(imageUrl) : imageUrl);
+        setCategories(freshCategories.map((c) => ({ ...c, imageUrl: withBlobUrl(c.imageUrl) })));
+        setRestocks(freshRestocks.map((r) => ({ ...r, imageUrl: withBlobUrl(r.imageUrl) })));
+
+        // Превью товаров в поиске не блокируют показ экрана — не так
+        // критично для первого впечатления, греем сетевой кеш в фоне
+        // (без блокирующего скачивания байт, как для ленты выше).
+        freshProducts.slice(0, 12).forEach((p) => {
+          if (p.imageUrl) new Image().src = p.imageUrl;
+        });
       } catch (err) {
         console.error('Не удалось загрузить данные аккаунта:', err);
         if (!cancelled) setLoadError(err.message || 'Не удалось загрузить данные');

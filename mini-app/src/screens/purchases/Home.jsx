@@ -55,8 +55,8 @@ export default function PurchasesHome() {
                     <span className="list-row__title">{entry.title}</span>
                     <span className="list-row__meta">
                       {(entry.kind === 'account'
-                        ? [entry.geoFlag, entry.geo, entry.platform, entry.qty ? `${entry.qty} шт.` : null]
-                        : [entry.platform, entry.type]
+                        ? [entry.geo, entry.type, entry.qty ? `${entry.qty} шт.` : null]
+                        : [entry.type]
                       )
                         .filter(Boolean)
                         .join(' · ')}
@@ -82,7 +82,7 @@ export default function PurchasesHome() {
                   <RowIcon productId={entry.productId} kind="subscription" getProduct={getProduct} />
                   <div className="list-row__body">
                     <span className="list-row__title">{entry.title}</span>
-                    <span className="list-row__meta">{[entry.platform, entry.type].filter(Boolean).join(' · ')}</span>
+                    <span className="list-row__meta">{[entry.type].filter(Boolean).join(' · ')}</span>
                   </div>
                   <span className="list-row__amount list-row__amount--accent">
                     ${entry.price.toFixed(2)}/{entry.period}

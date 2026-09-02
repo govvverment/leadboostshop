@@ -13,6 +13,10 @@ export default function AdminInventory() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [saving, setSaving] = useState(false);
+  // .zip-файлы (второй способ пополнения склада, наравне с текстом выше) —
+  // один zip = один аккаунт. Можно выбрать сразу несколько файлов.
+  const [zipFiles, setZipFiles] = useState([]);
+  const [zipSaving, setZipSaving] = useState(false);
 
   const load = () => {
     adminApi
@@ -85,6 +89,36 @@ export default function AdminInventory() {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleZipSelect = (e) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (!files.length) return;
+    setZipFiles((prev) => [...prev, ...files]);
+  };
+
+  const removeZipFile = (index) => {
+    setZipFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleZipUpload = async () => {
+    setError(null);
+    setSuccess(null);
+    if (!zipFiles.length) return setError('Выберите хотя бы один .zip файл');
+
+    setZipSaving(true);
+    try {
+      const { files } = await adminApi.uploadAccountFiles(zipFiles);
+      const result = await adminApi.addFileInventory(id, files);
+      setSuccess(`Добавлено аккаунтов: ${result.added}`);
+      setZipFiles([]);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setZipSaving(false);
     }
   };
 
@@ -179,6 +213,59 @@ export default function AdminInventory() {
         </button>
       </form>
 
+      {!isLink && (
+        <div style={{ marginTop: 24 }}>
+          <h3 className="section__title">Добавить .zip-файлами</h3>
+          <p className="hint-text" style={{ textAlign: 'left', margin: '0 0 10px' }}>
+            Второй способ, отдельно от текста выше — один .zip файл = один аккаунт. Можно
+            выбрать сразу несколько.
+          </p>
+
+          <label className="btn btn--secondary btn--block" style={{ textAlign: 'center' }}>
+            📦 Выбрать ZIP-файлы
+            <input
+              type="file"
+              accept=".zip,application/zip,application/x-zip-compressed"
+              multiple
+              onChange={handleZipSelect}
+              style={{ display: 'none' }}
+            />
+          </label>
+
+          {zipFiles.length > 0 && (
+            <div className="list" style={{ marginTop: 8 }}>
+              {zipFiles.map((file, i) => (
+                <div key={`${file.name}-${i}`} className="file-card" style={{ marginBottom: 6 }}>
+                  <span className="file-card__icon">📦</span>
+                  <div className="file-card__body">
+                    <span className="file-card__name">{file.name}</span>
+                    <span className="file-card__meta">{(file.size / 1024).toFixed(0)} KB</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="detail-list__link"
+                    style={{ marginLeft: 'auto' }}
+                    onClick={() => removeZipFile(i)}
+                  >
+                    Убрать
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="btn btn--primary btn--block"
+            style={{ marginTop: 10 }}
+            disabled={zipSaving || zipFiles.length === 0}
+            onClick={handleZipUpload}
+          >
+            {zipSaving ? 'Загрузка...' : 'Добавить в склад'}
+          </button>
+        </div>
+      )}
+
       <h3 className="section__title" style={{ marginTop: 24 }}>
         Что уже загружено
       </h3>
@@ -192,7 +279,7 @@ export default function AdminInventory() {
             <div key={item.id} className="list-row list-row--static">
               <div className="list-row__body">
                 <span className="list-row__title" style={item.link ? { wordBreak: 'break-all' } : undefined}>
-                  {item.link || item.login}
+                  {item.file_path ? `📦 ${item.file_name || 'account.zip'}` : item.link || item.login}
                 </span>
                 <span className="list-row__meta">
                   {item.extra ? `${item.extra} · ` : ''}

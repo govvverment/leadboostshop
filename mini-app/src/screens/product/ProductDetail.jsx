@@ -42,18 +42,15 @@ export default function ProductDetail() {
       ? [
           ['GEO', [product.geo, product.geoFlag].filter(Boolean).join(' ')],
           ['Тип', product.type],
-          ['Платформа', product.platform],
         ]
       : isSubscription
       ? [
           ['Период', product.periodLabel],
           ['Тип', product.type],
-          ['Платформа', product.platform],
         ]
       : [
           ['Лицензия', product.license],
           ['Тип', product.type],
-          ['Платформа', product.platform],
         ]
   ).filter(([, value]) => Boolean(value));
 

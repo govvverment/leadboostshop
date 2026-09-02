@@ -5,7 +5,8 @@ import { requireAdminSession } from '../_shared/adminAuth.ts';
 
 // POST { token в заголовке Authorization, action, ...данные }
 // action: 'list' | 'create' | 'update' | 'archive' | 'restore' | 'delete' |
-//   'optimize-images'
+//   'list-inventory' | 'bulk-add-inventory' | 'add-file-inventory' |
+//   'clear-inventory' | 'optimize-images' | ...категории
 
 // Та же логика сжатия, что и в admin-upload — но применяется задним
 // числом к уже загруженным картинкам. Сжатие при загрузке (admin-upload)
@@ -211,13 +212,52 @@ Deno.serve(async (req) => {
         inventoryRows = parsed.rows;
       }
 
+      // Второй способ загрузки начального склада — .zip-файлы (уже
+      // загруженные в приватный бакет через admin-upload-account-file,
+      // сюда приходят только их пути). Складывается вместе с текстовым
+      // способом выше — можно использовать любой из них или оба сразу.
+      if (Array.isArray(body.inventoryFiles) && body.inventoryFiles.length > 0) {
+        for (const f of body.inventoryFiles) {
+          if (!f || typeof f.path !== 'string' || !f.path) continue;
+          inventoryRows.push({
+            id: crypto.randomUUID(),
+            product_id: id,
+            file_path: f.path,
+            file_name: typeof f.name === 'string' ? f.name : null,
+            status: 'available',
+          });
+        }
+      }
+
+      // Автоподхват иконки: если это аккаунт с указанной соцсетью, но без
+      // своей картинки — берём картинку с любого уже существующего товара
+      // той же соцсети (обычно это и есть логотип соцсети, один раз
+      // загруженный админом вручную). Экономит повторную загрузку одной и
+      // той же картинки на каждый новый аккаунт этой соцсети — иконка
+      // "наследуется" автоматически. Явно переданная imageUrl (например,
+      // при редактировании с уже загруженным фото) в приоритете и это
+      // правило не переопределяет.
+      let imageUrl = body.imageUrl ?? null;
+      if (!imageUrl && body.kind === 'account' && body.network) {
+        const { data: sibling } = await supabase
+          .from('products')
+          .select('image_url')
+          .eq('kind', 'account')
+          .eq('network', body.network)
+          .not('image_url', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (sibling?.image_url) imageUrl = sibling.image_url;
+      }
+
       const { error: dbError } = await supabase.from('products').insert({
         id,
         category_id: body.category,
         kind: body.kind,
         title: body.title,
         description: body.description ?? null,
-        image_url: body.imageUrl ?? null,
+        image_url: imageUrl,
         price: body.price,
         geo: body.geo ?? null,
         geo_flag: body.geoFlag ?? null,
@@ -335,7 +375,7 @@ Deno.serve(async (req) => {
       if (!body.productId) return withCors({ error: 'productId обязателен' }, 400);
       const { data, error } = await supabase
         .from('account_inventory')
-        .select('id, login, link, extra, instructions_url, status, created_at, sold_at')
+        .select('id, login, link, extra, instructions_url, file_path, file_name, status, created_at, sold_at')
         .eq('product_id', body.productId)
         .order('created_at', { ascending: false });
       if (error) return withCors({ error: error.message }, 500);
@@ -361,6 +401,43 @@ Deno.serve(async (req) => {
       const parsed = buildInventoryRows(body.productId, product.kind, body.text);
       if (parsed.error) return withCors({ error: parsed.error }, 400);
       const rows = parsed.rows;
+
+      const { error } = await supabase.from('account_inventory').insert(rows);
+      if (error) return withCors({ error: error.message }, 500);
+      return withCors({ added: rows.length });
+    }
+
+    // Пополнение склада .zip-файлами — второй способ, наравне с
+    // bulk-add-inventory (текст). Файлы уже должны быть загружены в
+    // приватный бакет account-files через admin-upload-account-file,
+    // сюда приходят только их пути — по одному account_inventory на
+    // файл (1 zip = 1 аккаунт). Доступно только для kind='account'.
+    if (action === 'add-file-inventory') {
+      if (!body.productId) return withCors({ error: 'productId обязателен' }, 400);
+      if (!Array.isArray(body.files) || body.files.length === 0) {
+        return withCors({ error: 'Список файлов пуст' }, 400);
+      }
+
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('kind')
+        .eq('id', body.productId)
+        .single();
+      if (productError) return withCors({ error: productError.message }, 500);
+      if (product.kind !== 'account') {
+        return withCors({ error: 'Загрузка .zip доступна только для товаров типа "Аккаунт"' }, 400);
+      }
+
+      const rows = body.files
+        .filter((f: unknown): f is { path: string; name?: string } => Boolean((f as { path?: string })?.path))
+        .map((f: { path: string; name?: string }) => ({
+          id: crypto.randomUUID(),
+          product_id: body.productId,
+          file_path: f.path,
+          file_name: f.name ?? null,
+          status: 'available',
+        }));
+      if (rows.length === 0) return withCors({ error: 'Список файлов пуст' }, 400);
 
       const { error } = await supabase.from('account_inventory').insert(rows);
       if (error) return withCors({ error: error.message }, 500);

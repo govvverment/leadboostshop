@@ -538,12 +538,16 @@
   flex: 1;
 }
 
+/* Раньше строка фильтров была горизонтально скроллируемой
+   (overflow-x: auto) — из-за этого при появлении/смене чипов ряд
+   визуально "ездил" и мог показывать обрезанный чип на краю экрана.
+   Чипов немного (Все / GEO / Тип аккаунта) — переносим на вторую
+   строку, если не влезли, вместо скролла. */
 .filter-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
   margin-bottom: 16px;
-  padding-bottom: 2px;
 }
 
 .filter-chip {
@@ -578,52 +582,127 @@
   flex-shrink: 0;
 }
 
-.filter-bar {
-  position: relative;
-}
-
-/* Обёртка чипа-дропдауна (GEO / Тип) в CategoryList.jsx — меню выпадает
-   строго под своим чипом, а не под левым краем всей панели фильтров. */
-.filter-dropdown {
-  position: relative;
-}
-
-.filter-dropdown__menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 20;
-  min-width: 140px;
-  max-height: 240px;
-  overflow-y: auto;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 6px;
+/* Выбор значения фильтра (GEO / Тип аккаунта) — нижняя шторка
+   (SheetOverlay), тот же компонент, что и на экране подтверждения
+   покупки. Раньше это был мини-дропдаун (position: absolute) прямо под
+   чипом — на практике он оказывался ниже по стеку, чем карточки товаров
+   под ним, и "вылезал" из-под них вместо того, чтобы быть поверх.
+   Шторка всегда рендерится в оверлее на весь экран (z-index: 200,
+   см. .sheet-overlay), поэтому такой проблемы больше нет. */
+.filter-sheet__list {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
-.filter-dropdown__item {
+.filter-sheet__item {
   width: 100%;
   text-align: left;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-size: 13.5px;
+  font-size: 14.5px;
 }
 
-.filter-dropdown__item:hover {
+/* "Полка" фильтра по соцсети — выезжает вниз прямо под строкой фильтров
+   (обычный блок в потоке документа, не оверлей), поэтому не может
+   перекрыть/быть перекрытой карточками товаров под ней, как раньше
+   было с абсолютно спозиционированными дропдаунами. Оформлена отдельной
+   "плашкой" (свой фон, скругление, отступ сверху от строки фильтров) —
+   так граница между "строка фильтров" и "открывшийся выбор" читается
+   сразу, без явного разделителя-линии.  */
+.social-shelf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  /* Отступ снизу — чтобы список аккаунтов под открытой полкой не
+     прилипал к ней вплотную, а граница между блоком фильтров и списком
+     товаров была чётко видна. */
+  margin-bottom: 18px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  animation: social-shelf-in 0.18s ease;
+}
+
+@keyframes social-shelf-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Иконка-кнопка целиком — сама иконка соцсети занимает практически всю
+   кнопку (как просили: "иконкой полностью заполняем место в кнопке"),
+   без подписи под ней. Название соцсети по-прежнему доступно — через
+   title/aria-label (всплывающая подсказка + доступность). */
+.social-shelf__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  color: var(--text-secondary);
+}
+
+/* Выбранная иконка — та самая фиолетовая обводка, как у активных
+   элементов по всему приложению (var(--accent)). */
+.social-shelf__item.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Чип "Все" — та же посадка, что у иконок, но текстом. */
+.social-shelf__item--all {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Фото соцсети — реальная картинка уже загруженного товара этой же
+   соцсети (см. platformImages в CategoryList.jsx), а не нарисованная
+   иконка. Заполняет кнопку целиком, вплоть до внутреннего края рамки. */
+.social-shelf__photo {
+  width: 100%;
+  height: 100%;
+  border-radius: calc(var(--radius-md) - 1.5px);
+  object-fit: cover;
+}
+
+.platform-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.platform-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.filter-sheet__item:hover {
   background: var(--surface-2);
 }
 
-.filter-dropdown__item.is-active {
+.filter-sheet__item.is-active {
   color: var(--accent);
   background: var(--accent-soft);
+  font-weight: 600;
 }
 
 /* ===== Product card / list ===== */

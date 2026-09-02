@@ -47,11 +47,21 @@ Deno.serve(async (req) => {
     return new Response('Покупка не найдена', { status: 404, headers: CORS_HEADERS });
   }
 
-  const lines = purchase.credentials.map((cred: { login: string; password: string; extra?: string | null }) =>
+  // Аккаунты, выданные вторым способом (.zip, см. account_inventory
+  // .file_path), в этот текстовый файл не попадают — у них нет
+  // login/password, они скачиваются отдельно через download-account-file.
+  const textCredentials = purchase.credentials.filter(
+    (cred: { login?: string; filePath?: string }) => Boolean(cred.login) && !cred.filePath
+  );
+  if (textCredentials.length === 0) {
+    return new Response('Нет текстовых данных для этой покупки', { status: 404, headers: CORS_HEADERS });
+  }
+
+  const lines = textCredentials.map((cred: { login: string; password: string; extra?: string | null }) =>
     cred.extra ? `${cred.login}:${cred.password}:${cred.extra}` : `${cred.login}:${cred.password}`
   );
   const dateStr = new Date(purchase.created_at).toLocaleDateString('ru-RU').replace(/\./g, '');
-  const fileName = sanitizeFileName(`accounts_${dateStr}_${purchase.qty ?? purchase.credentials.length}.txt`);
+  const fileName = sanitizeFileName(`accounts_${dateStr}_${textCredentials.length}.txt`);
 
   return new Response(lines.join('\n'), {
     headers: {

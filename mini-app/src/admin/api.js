@@ -71,11 +71,23 @@ export const adminApi = {
   archiveProduct: (id) => callFunction('admin-products', { action: 'archive', id }),
   restoreProduct: (id) => callFunction('admin-products', { action: 'restore', id }),
   deleteProduct: (id) => callFunction('admin-products', { action: 'delete', id }),
+  optimizeImages: () => callFunction('admin-products', { action: 'optimize-images' }),
   uploadImage: (file) => {
     const form = new FormData();
     form.append('image', file);
     return callFunction('admin-upload', form, { isFormData: true });
   },
+
+  // .zip-файлы аккаунтов (второй способ выдачи, наравне с login:password).
+  // Можно передать сразу несколько — один запрос на загрузку; после
+  // этого addFileInventory создаёт по одной строке склада на файл.
+  uploadAccountFiles: (files) => {
+    const form = new FormData();
+    for (const file of files) form.append('files', file);
+    return callFunction('admin-upload-account-file', form, { isFormData: true });
+  },
+  addFileInventory: (productId, files) =>
+    callFunction('admin-products', { action: 'add-file-inventory', productId, files }),
 
   getOverview: () => callFunction('admin-stats', { action: 'overview' }),
   getRevenueByDay: (days = 14) => callFunction('admin-stats', { action: 'revenue-by-day', days }),

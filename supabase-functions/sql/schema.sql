@@ -56,6 +56,7 @@ create table if not exists products (
   geo_flag      text,
   platform      text,
   type          text,
+  network       text, -- соцсеть (Instagram/Telegram/...) для kind='account' — фильтр "Соцсеть" в каталоге
   stock         integer, -- используется только для kind, не завязанных на склад (сейчас — фактически не используется, живой остаток считается из account_inventory)
   license       text,
   period        text,
@@ -175,6 +176,9 @@ create table if not exists account_inventory (
   extra        text, -- необязательное доп. поле (email восстановления / ключ активации)
   link         text, -- для one-time/subscription — ссылка на скачивание
   instructions_url text, -- необязательная ссылка на инструкцию (для one-time/subscription)
+  file_path    text, -- путь к .zip-файлу в приватном storage-бакете account-files —
+                      -- второй способ выдачи аккаунта (доп. к login/password), 1 zip = 1 аккаунт
+  file_name    text, -- оригинальное имя загруженного .zip, для красивого имени при скачивании
   status       text not null default 'available', -- available | sold
   purchase_id  text references purchases(id) deferrable initially deferred,
   created_at   timestamptz not null default now(),
@@ -405,9 +409,15 @@ begin
       set status = 'sold', purchase_id = v_purchase_id, sold_at = now()
       from picked
       where ai.id = picked.id
-      returning ai.login, ai.password, ai.extra
+      returning ai.login, ai.password, ai.extra, ai.file_path, ai.file_name
     )
-    select jsonb_agg(jsonb_build_object('login', login, 'password', password, 'extra', extra))
+    -- filePath/fileName — второй способ выдачи (zip-файл, см. account_inventory.file_path).
+    -- У старых/текстовых строк они null и просто не попадают в объект
+    -- ниже — существующий формат {login,password,extra} не меняется.
+    select jsonb_agg(jsonb_build_object(
+      'login', login, 'password', password, 'extra', extra,
+      'filePath', file_path, 'fileName', file_name
+    ))
       into v_credentials
     from updated;
 
@@ -626,6 +636,15 @@ on conflict (id) do nothing;
 create policy "Публичное чтение картинок товаров"
   on storage.objects for select
   using (bucket_id = 'product-images');
+
+-- "public" = false — это выданные покупателям .zip с данными аккаунтов,
+-- никто посторонний не должен иметь к ним доступ по прямой ссылке.
+-- Загрузка (админкой) и скачивание (покупателем, только своего файла)
+-- идут исключительно через Edge Functions на service_role — публичных
+-- policy на этот бакет нет и не должно быть.
+insert into storage.buckets (id, name, public)
+values ('account-files', 'account-files', false)
+on conflict (id) do nothing;
 
 create or replace function admin_stats_overview() returns jsonb
 language plpgsql security definer set search_path = public as $$

@@ -24,7 +24,8 @@ export default function ProductImage({ product, size = 40 }) {
       <img
         src={product.imageUrl}
         alt=""
-        loading="lazy"
+        loading="eager"
+        fetchPriority="high"
         decoding="async"
         className="product-image__img"
         style={{ opacity: status === 'loaded' ? 1 : 0 }}
