@@ -131,6 +131,7 @@ create table if not exists balance_history (
   meta        text,
   amount      numeric(10,2) not null,
   status      text not null default 'success',
+  product_id  text references products(id), -- товар, с которым связана запись (для фото в истории); null у пополнений
   created_at  timestamptz not null default now()
 );
 alter table balance_history enable row level security;
@@ -318,8 +319,13 @@ begin
       from subscriptions s where s.user_id = p_telegram_id
     ), '[]'::jsonb),
     'balanceHistory', coalesce((
-      select jsonb_agg(row_to_json(h) order by h.created_at desc)
-      from balance_history h where h.user_id = p_telegram_id
+      select jsonb_agg(
+        (to_jsonb(h) || jsonb_build_object('imageUrl', pr.image_url))
+        order by h.created_at desc
+      )
+      from balance_history h
+      left join products pr on pr.id = h.product_id
+      where h.user_id = p_telegram_id
       limit 50
     ), '[]'::jsonb),
     'referral', jsonb_build_object(
@@ -425,9 +431,9 @@ begin
     values (v_purchase_id, p_telegram_id, p_product_id, v_product.title, v_product.kind, p_qty, v_total, 'paid', v_credentials,
             v_product.geo, v_product.geo_flag, v_product.platform, v_product.type);
 
-    insert into balance_history (id, user_id, type, title, meta, amount, status)
+    insert into balance_history (id, user_id, type, title, meta, amount, status, product_id)
     values ('h_' || replace(gen_random_uuid()::text, '-', ''), p_telegram_id, 'purchase',
-            v_product.title, p_qty || ' шт.', -v_total, 'success');
+            v_product.title, p_qty || ' шт.', -v_total, 'success', p_product_id);
 
   elsif v_product.kind = 'one-time' then
     v_purchase_id := 'p_' || replace(gen_random_uuid()::text, '-', '');
@@ -454,9 +460,9 @@ begin
     values (v_purchase_id, p_telegram_id, p_product_id, v_product.title, v_product.kind, v_total, 'paid', v_credentials,
             v_product.platform, v_product.type, v_product.license);
 
-    insert into balance_history (id, user_id, type, title, meta, amount, status)
+    insert into balance_history (id, user_id, type, title, meta, amount, status, product_id)
     values ('h_' || replace(gen_random_uuid()::text, '-', ''), p_telegram_id, 'purchase',
-            v_product.title, null, -v_total, 'success');
+            v_product.title, null, -v_total, 'success', p_product_id);
 
   elsif v_product.kind = 'subscription' then
     -- Забираем свежую свободную строку склада (ссылка + доп.инфо +
@@ -500,9 +506,9 @@ begin
       );
     end if;
 
-    insert into balance_history (id, user_id, type, title, meta, amount, status)
+    insert into balance_history (id, user_id, type, title, meta, amount, status, product_id)
     values ('h_' || replace(gen_random_uuid()::text, '-', ''), p_telegram_id, 'subscription',
-            v_product.title, null, -v_total, 'success');
+            v_product.title, null, -v_total, 'success', p_product_id);
 
   end if;
 
@@ -512,9 +518,9 @@ begin
       update users set balance = balance + v_referral_amount where telegram_id = v_referred_by;
       insert into referral_earnings (id, referrer_id, referred_user_id, purchase_id, amount)
       values ('r_' || replace(gen_random_uuid()::text, '-', ''), v_referred_by, p_telegram_id, v_purchase_id, v_referral_amount);
-      insert into balance_history (id, user_id, type, title, meta, amount, status)
+      insert into balance_history (id, user_id, type, title, meta, amount, status, product_id)
       values ('h_' || replace(gen_random_uuid()::text, '-', ''), v_referred_by, 'referral',
-              'Реферальное вознаграждение', v_product.title, v_referral_amount, 'success');
+              'Реферальное вознаграждение', v_product.title, v_referral_amount, 'success', p_product_id);
     end if;
   end if;
 

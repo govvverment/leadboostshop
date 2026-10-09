@@ -17,6 +17,7 @@ export default function AdminInventory() {
   // один zip = один аккаунт. Можно выбрать сразу несколько файлов.
   const [zipFiles, setZipFiles] = useState([]);
   const [zipSaving, setZipSaving] = useState(false);
+  const [deletingItemId, setDeletingItemId] = useState(null);
 
   const load = () => {
     adminApi
@@ -35,6 +36,11 @@ export default function AdminInventory() {
 
   const isLink = product?.kind === 'one-time' || product?.kind === 'subscription';
   const noun = isLink ? 'ссылок' : 'аккаунтов';
+  // .zip-склад доступен для account (обычные аккаунты) и one-time
+  // (категория "Технические решения" — формат "1 zip = 1 товар = 1
+  // единица склада"), но не для subscription — у подписок отдельный,
+  // накопительный флоу выдачи, файлы туда пока не заведены.
+  const canZip = product?.kind === 'account' || product?.kind === 'one-time';
 
   const available = (items || []).filter((i) => i.status === 'available').length;
   const sold = (items || []).filter((i) => i.status === 'sold').length;
@@ -101,6 +107,23 @@ export default function AdminInventory() {
 
   const removeZipFile = (index) => {
     setZipFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDeleteItem = async (item) => {
+    const label = item.file_path ? item.file_name || 'account.zip' : item.link || item.login;
+    if (!window.confirm(`Удалить эту позицию склада (${label})? Это необратимо.`)) return;
+
+    setDeletingItemId(item.id);
+    setError(null);
+    setSuccess(null);
+    try {
+      await adminApi.deleteInventoryItem(item.id);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingItemId(null);
+    }
   };
 
   const handleZipUpload = async () => {
@@ -213,11 +236,11 @@ export default function AdminInventory() {
         </button>
       </form>
 
-      {!isLink && (
+      {canZip && (
         <div style={{ marginTop: 24 }}>
           <h3 className="section__title">Добавить .zip-файлами</h3>
           <p className="hint-text" style={{ textAlign: 'left', margin: '0 0 10px' }}>
-            Второй способ, отдельно от текста выше — один .zip файл = один аккаунт. Можно
+            Второй способ, отдельно от текста выше — один .zip файл = одна единица товара. Можно
             выбрать сразу несколько.
           </p>
 
@@ -290,6 +313,16 @@ export default function AdminInventory() {
               <span className={'badge' + (item.status === 'sold' ? ' badge--muted' : ' badge--success')}>
                 {item.status === 'sold' ? 'Продан' : 'Свободен'}
               </span>
+              <button
+                type="button"
+                className="detail-list__link"
+                style={{ marginLeft: 10, color: 'var(--danger)' }}
+                disabled={deletingItemId === item.id}
+                onClick={() => handleDeleteItem(item)}
+                aria-label="Удалить позицию"
+              >
+                {deletingItemId === item.id ? '...' : '✕'}
+              </button>
             </div>
           ))}
         </div>

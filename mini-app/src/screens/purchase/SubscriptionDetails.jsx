@@ -5,7 +5,6 @@ import EmptyState from '../../components/EmptyState';
 import ProductIcon from '../../components/ProductIcon';
 import ProductImage from '../../components/ProductImage';
 import { LoaderCompact } from '../../components/Loader';
-import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 
 export default function SubscriptionDetails() {
@@ -73,17 +72,18 @@ export default function SubscriptionDetails() {
 
         <h3 className="section__title">Характеристики</h3>
         <div className="detail-list">
-          {[
-            ['Период', sub.periodLabel],
-            ['Тип', sub.type],
-          ]
-            .filter(([, value]) => Boolean(value))
-            .map(([label, value]) => (
-              <div className="detail-list__row" key={label}>
-                <span>{label}</span>
-                <span>{value}</span>
-              </div>
-            ))}
+          <div className="detail-list__row">
+            <span>Период</span>
+            <span>{sub.periodLabel}</span>
+          </div>
+          <div className="detail-list__row">
+            <span>Тип</span>
+            <span>{sub.type}</span>
+          </div>
+          <div className="detail-list__row">
+            <span>Платформа</span>
+            <span>{sub.platform}</span>
+          </div>
         </div>
 
         <h3 className="section__title">Подписка</h3>
@@ -111,47 +111,29 @@ export default function SubscriptionDetails() {
           <div className={'detail-list' + (isExpired ? ' detail-list--dim' : '')}>
             <div className="detail-list__row">
               <span>Ссылка</span>
-              {isExpired ? (
-                <span className="mono" style={{ wordBreak: 'break-all', textAlign: 'right' }}>
-                  {sub.accessLink}
-                </span>
-              ) : (
-                <a
-                  className="detail-list__link access-row__action"
-                  href={/^https?:\/\//.test(sub.accessLink) ? sub.accessLink : `https://${sub.accessLink}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Открыть <Icon name="externalLink" className="access-row__icon" />
-                </a>
-              )}
+              <button
+                className="detail-list__link mono"
+                style={{ wordBreak: 'break-all', textAlign: 'right' }}
+                disabled={isExpired}
+                onClick={() => copy(sub.accessLink)}
+              >
+                {sub.accessLink}
+              </button>
             </div>
             {sub.accessKey && (
               <div className="detail-list__row">
-                <span>Ключ доступа</span>
-                <span className="mono access-row__value">
-                  {showKey ? sub.accessKey : '••••••••••'}
-                  <button className="eye-toggle" onClick={() => setShowKey((v) => !v)} aria-label="Показать/скрыть">
-                    <Icon name={showKey ? 'eyeOff' : 'eye'} size={14} />
+                <span>Доп. инфо</span>
+                <span className="mono">
+                  {showKey ? sub.accessKey : '••••••••••'}{' '}
+                  <button className="eye-toggle" onClick={() => setShowKey((v) => !v)}>
+                    {showKey ? '🙈' : '👁'}
                   </button>
                   {showKey && (
                     <button className="detail-list__link" onClick={() => copy(sub.accessKey)}>
-                      <Icon name="copy" size={14} />
+                      Копировать
                     </button>
                   )}
                 </span>
-              </div>
-            )}
-            {sub.accessInstructionsUrl && (
-              <div className="detail-list__row">
-                <span>Инструкция</span>
-                {isExpired ? (
-                  <span>Открыть ↗</span>
-                ) : (
-                  <a className="detail-list__link access-row__action" href={sub.accessInstructionsUrl} target="_blank" rel="noreferrer">
-                    Открыть <Icon name="externalLink" className="access-row__icon" />
-                  </a>
-                )}
               </div>
             )}
           </div>
@@ -165,6 +147,23 @@ export default function SubscriptionDetails() {
           <button className="btn btn--primary btn--block" onClick={handleRenew} disabled={loading}>
             {loading ? <LoaderCompact /> : `Продолжить за $${sub.price.toFixed(2)}`}
           </button>
+        )}
+
+        {sub.orderNumber && (
+          <>
+            <h3 className="section__title">Номер заказа</h3>
+            <div className="detail-list">
+              <div className="detail-list__row">
+                <span>Номер</span>
+                <button className="detail-list__link mono" onClick={() => copy(sub.orderNumber)}>
+                  {sub.orderNumber}
+                </button>
+              </div>
+            </div>
+            <p className="hint-text" style={{ textAlign: 'left', marginTop: 8 }}>
+              Напишите этот номер менеджеру в личные сообщения — он поможет оформить заказ дальше.
+            </p>
+          </>
         )}
       </div>
     </Screen>

@@ -20,6 +20,8 @@ const emptyForm = {
   license: '',
   period: 'мес',
   periodLabel: '1 месяц',
+  managerOrder: false,
+  manualStock: false,
 };
 
 function Field({ label, children }) {
@@ -42,6 +44,7 @@ export default function AdminProductForm() {
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [categories, setCategories] = useState(null);
+  const [networks, setNetworks] = useState([]);
   const [inventoryFiles, setInventoryFiles] = useState([]);
   const [inventoryText, setInventoryText] = useState('');
   // .zip-файлы аккаунтов (второй способ, наравне с TXT выше) — один
@@ -64,6 +67,17 @@ export default function AdminProductForm() {
       .catch((err) => setError(err.message));
   }, [isEdit]);
 
+  // Справочник соцсетей — иконки, которые можно переиспользовать: при
+  // выборе/вводе названия, совпадающего с уже известной соцсетью, картинка
+  // подставится сама (см. handleNetworkChange). Список растёт своей жизнью
+  // в разделе "Соцсети" — здесь только читаем.
+  useEffect(() => {
+    adminApi
+      .getNetworks()
+      .then(setNetworks)
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!isEdit) return;
     adminApi
@@ -81,6 +95,28 @@ export default function AdminProductForm() {
   }, [id, isEdit]);
 
   const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  // "Ручное количество" — для аккаунтов, которые выдаются лично в ЛС, без
+  // реального склада (login/password или zip). Включение сразу ставит
+  // "Заказ через менеджера" — без реальной выдачи это не опция, а
+  // необходимость (покупателю больше неоткуда узнать, что делать дальше).
+  // Выключение галочку менеджера НЕ снимает обратно — админ мог захотеть
+  // её и для обычного склада, трогать чужой выбор не нужно.
+  const handleManualStockChange = (checked) => {
+    setForm((f) => ({ ...f, manualStock: checked, managerOrder: checked ? true : f.managerOrder }));
+  };
+
+  // Подстановка иконки соцсети при выборе/вводе названия — сравниваем без
+  // учёта регистра, чтобы "instagram" и "Instagram" считались одной сетью.
+  // Картинку трогаем, только если поле изображения ещё пустое — не
+  // перетираем то, что админ уже сам загрузил для этого конкретного товара.
+  const handleNetworkChange = (value) => {
+    update('network', value);
+    const match = networks.find((n) => n.title.toLowerCase() === value.trim().toLowerCase());
+    if (match?.iconUrl) {
+      setForm((f) => (f.imageUrl ? f : { ...f, imageUrl: match.iconUrl }));
+    }
+  };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -135,6 +171,9 @@ export default function AdminProductForm() {
 
     if (!form.title.trim()) return setError('Укажите название товара');
     if (!form.price || Number(form.price) <= 0) return setError('Укажите цену больше нуля');
+    if (form.kind === 'account' && form.manualStock && (form.stock === '' || Number(form.stock) < 0)) {
+      return setError('Укажите количество (0 и больше)');
+    }
 
     const payload = {
       title: form.title.trim(),
@@ -148,11 +187,13 @@ export default function AdminProductForm() {
       platform: form.platform || null,
       type: form.type || null,
       network: form.kind === 'account' ? form.network || null : null,
-      stock: form.kind === 'account' ? Number(form.stock) : null,
+      stock: form.kind === 'account' ? Number(form.stock) || 0 : null,
       license: form.kind === 'one-time' ? form.license : null,
       period: form.kind === 'subscription' ? form.period : null,
       periodLabel: form.kind === 'subscription' ? form.periodLabel : null,
-      ...(!isEdit && inventoryText.trim() ? { inventoryText: inventoryText.trim() } : {}),
+      managerOrder: Boolean(form.managerOrder),
+      manualStock: form.kind === 'account' ? Boolean(form.manualStock) : false,
+      ...(!isEdit && !form.manualStock && inventoryText.trim() ? { inventoryText: inventoryText.trim() } : {}),
     };
 
     setSaving(true);
@@ -239,7 +280,45 @@ export default function AdminProductForm() {
           />
         </Field>
 
-        {(form.kind === 'account' || form.kind === 'one-time' || form.kind === 'subscription') && (
+        {form.kind === 'account' && (
+          <Field label="Способ выдачи">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(form.manualStock)}
+                onChange={(e) => handleManualStockChange(e.target.checked)}
+                style={{ width: 18, height: 18 }}
+              />
+              <span style={{ fontSize: 13 }}>Ручное количество — без реального склада, выдаю сам в ЛС</span>
+            </label>
+            <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
+              Для позиций без логина/пароля или .zip на складе — вместо этого покупателя после
+              оплаты всегда направляет к менеджеру (включает галочку «Заказ через менеджера»
+              ниже). Количество задаёте вручную полем ниже — оно просто уменьшается на каждую
+              покупку, пополняйте его сами по мере необходимости.
+            </span>
+          </Field>
+        )}
+
+        {form.kind === 'account' && form.manualStock && (
+          <Field label="Количество">
+            <input
+              className="text-input"
+              type="number"
+              min="0"
+              step="1"
+              value={form.stock}
+              onChange={(e) => update('stock', e.target.value)}
+              placeholder="0"
+            />
+            <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
+              Сколько сейчас реально можно продать. При каждой покупке автоматически уменьшается —
+              когда пополните запас сами, поднимите число здесь заново.
+            </span>
+          </Field>
+        )}
+
+        {(form.kind === 'one-time' || form.kind === 'subscription' || (form.kind === 'account' && !form.manualStock)) && (
           <div className="hint-text" style={{ textAlign: 'left', margin: '0 0 14px' }}>
             Остаток теперь считается автоматически по загруженным {form.kind === 'account' ? 'аккаунтам' : 'ссылкам'}.
             {isEdit && (
@@ -262,7 +341,7 @@ export default function AdminProductForm() {
           </div>
         )}
 
-        {!isEdit && (
+        {!isEdit && !(form.kind === 'account' && form.manualStock) && (
           <Field label={form.kind === 'account' ? 'Данные аккаунтов (.txt)' : 'Данные ссылок (.txt)'}>
             <label className="btn btn--secondary btn--block" style={{ textAlign: 'center' }}>
               📄 Выбрать TXT-файлы
@@ -284,7 +363,7 @@ export default function AdminProductForm() {
           </Field>
         )}
 
-        {!isEdit && form.kind === 'account' && (
+        {!isEdit && (form.kind === 'account' || form.kind === 'one-time') && !(form.kind === 'account' && form.manualStock) && (
           <Field label="Данные аккаунтов (.zip)">
             <label className="btn btn--secondary btn--block" style={{ textAlign: 'center' }}>
               📦 Выбрать ZIP-файлы
@@ -298,7 +377,8 @@ export default function AdminProductForm() {
             </label>
             <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
               Второй способ, вместе с TXT выше или вместо него — можно выбрать сразу
-              несколько файлов. Один .zip = один аккаунт.
+              несколько файлов. Один .zip = одна единица товара (для «Технических решений» —
+              ровно то, что нужно: один архив на одного покупателя).
             </span>
             {inventoryZipFiles.length > 0 && (
               <div className="list" style={{ marginTop: 8 }}>
@@ -360,13 +440,21 @@ export default function AdminProductForm() {
           <Field label="Соцсеть">
             <input
               className="text-input"
+              list="network-options"
               value={form.network}
-              onChange={(e) => update('network', e.target.value)}
+              onChange={(e) => handleNetworkChange(e.target.value)}
               placeholder="Instagram"
             />
+            <datalist id="network-options">
+              {networks.map((n) => (
+                <option key={n.id} value={n.title} />
+              ))}
+            </datalist>
             <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
               Показывается отдельным фильтром в каталоге (наравне с GEO). Заполняйте одинаково
               для одной и той же соцсети — например, всегда «Instagram», а не иногда «instagram».
+              При выборе известной соцсети картинка ниже подставится автоматически (если ещё не
+              загружена своя) — сами иконки редактируются в разделе «Соцсети».
             </span>
           </Field>
         )}
@@ -380,6 +468,24 @@ export default function AdminProductForm() {
             <input className="text-input" value={form.license} onChange={(e) => update('license', e.target.value)} placeholder="Бессрочная" />
           </Field>
         )}
+
+        <Field label="Заказ через менеджера">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.managerOrder) || Boolean(form.manualStock)}
+              disabled={form.kind === 'account' && form.manualStock}
+              onChange={(e) => update('managerOrder', e.target.checked)}
+              style={{ width: 18, height: 18 }}
+            />
+            <span style={{ fontSize: 13 }}>Генерировать номер заказа и направлять к менеджеру</span>
+          </label>
+          <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
+            {form.kind === 'account' && form.manualStock
+              ? 'Обязательно для товара с ручным количеством — без этого покупатель не узнает, куда обращаться за аккаунтом.'
+              : 'Баланс списывается как обычно. Покупателю после оплаты покажется уникальный номер заказа (ORD-...) с просьбой написать его менеджеру в личные сообщения — сам номер появится и у вас в разделе «Заказы».'}
+          </span>
+        </Field>
 
         <Field label="Изображение">
           <div className="admin-image-upload">

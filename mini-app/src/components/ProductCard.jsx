@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import ProductImage from './ProductImage';
+import { useLocale } from '../context/LocaleContext';
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const isAccount = product.kind === 'account';
   const outOfStock = isAccount && product.stock <= 0;
 
@@ -25,10 +27,10 @@ export default function ProductCard({ product }) {
               {[product.geo, product.type].filter(Boolean).join(' · ')}
             </span>
             {outOfStock ? (
-              <span className="badge badge--muted">Нет в наличии</span>
+              <span className="badge badge--muted">{t('product.outOfStock')}</span>
             ) : (
               <span className="product-row__stock">
-                <span className="dot dot--success" /> {product.stock} шт.
+                <span className="dot dot--success" /> {product.stock} {t('product.pieces')}
               </span>
             )}
           </>
@@ -38,7 +40,7 @@ export default function ProductCard({ product }) {
               {[product.type].filter(Boolean).join(' · ')}
             </span>
             <span className={'badge' + (product.kind === 'subscription' ? ' badge--accent' : ' badge--success')}>
-              {product.kind === 'subscription' ? 'Подписка' : 'Разовая покупка'}
+              {product.kind === 'subscription' ? t('product.subscription') : t('product.oneTime')}
             </span>
           </>
         )}

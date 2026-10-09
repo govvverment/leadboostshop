@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useLocale } from '../context/LocaleContext';
 
 // Иконки сверены пиксель-в-пиксель с макетом (Bottom Navigation.png
 // из архива дизайна).
@@ -30,12 +31,13 @@ const ICONS = {
 };
 
 const items = [
-  { to: '/profile', label: 'Профиль', icon: 'profile' },
-  { to: '/products', label: 'Товары', icon: 'products' },
-  { to: '/purchases', label: 'Покупки', icon: 'purchases' },
+  { to: '/profile', labelKey: 'nav.profile', icon: 'profile' },
+  { to: '/products', labelKey: 'nav.products', icon: 'products' },
+  { to: '/purchases', labelKey: 'nav.purchases', icon: 'purchases' },
 ];
 
 export default function BottomNav() {
+  const { t } = useLocale();
   return (
     <nav className="bottom-nav">
       {items.map((item) => (
@@ -49,7 +51,7 @@ export default function BottomNav() {
               <span className="bottom-nav__icon" aria-hidden="true">
                 {ICONS[item.icon]}
               </span>
-              <span className="bottom-nav__label">{item.label}</span>
+              <span className="bottom-nav__label">{t(item.labelKey)}</span>
               {isActive && <span className="bottom-nav__indicator" />}
             </>
           )}

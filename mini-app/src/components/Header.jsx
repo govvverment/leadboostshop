@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { openSupportChat } from '../utils/support';
 import { useTheme } from '../context/ThemeContext';
+import { useLocale } from '../context/LocaleContext';
+import { LOCALES, LOCALE_LABELS } from '../i18n/translations';
 import logo from '../assets/logo.png';
 
 // logo импортируется как модуль (а не лежит в public/ и не грузится
@@ -25,6 +27,7 @@ function SupportIcon() {
 // Тумблер тёмная/светлая тема — просто переключатель, без подписей.
 function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
+  const { t } = useLocale();
   const isLight = theme === 'light';
   return (
     <button
@@ -32,7 +35,7 @@ function ThemeToggle() {
       className={'theme-toggle' + (isLight ? ' is-light' : '')}
       role="switch"
       aria-checked={isLight}
-      aria-label="Светлая тема"
+      aria-label={t('header.lightTheme')}
       onClick={toggleTheme}
     >
       <span className="theme-toggle__thumb" />
@@ -40,20 +43,44 @@ function ThemeToggle() {
   );
 }
 
+// Переключатель языка — компактный 3-позиционный тумблер (RU / UA / EN),
+// рядом с переключателем темы. Выбор запоминается в localStorage
+// (см. LocaleContext), по умолчанию — русский.
+function LocaleToggle() {
+  const { locale, setLocale, t } = useLocale();
+  return (
+    <div className="locale-toggle" role="group" aria-label={t('header.language')}>
+      {LOCALES.map((code) => (
+        <button
+          key={code}
+          type="button"
+          className={'locale-toggle__item' + (locale === code ? ' is-active' : '')}
+          aria-pressed={locale === code}
+          onClick={() => setLocale(code)}
+        >
+          {LOCALE_LABELS[code]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function Header() {
   const navigate = useNavigate();
+  const { t } = useLocale();
   return (
     <header className="app-header">
-      <button className="app-header__logo" onClick={() => navigate('/')} aria-label="На главную">
+      <button className="app-header__logo" onClick={() => navigate('/')} aria-label={t('header.home')}>
         <img src={logo} alt="LEAD BOOST" className="app-header__logo-img" />
       </button>
       <div className="app-header__right">
+        <LocaleToggle />
         <ThemeToggle />
         <button className="app-header__support" onClick={openSupportChat}>
           <span className="app-header__support-icon" aria-hidden="true">
             <SupportIcon />
           </span>
-          Поддержка
+          <span className="app-header__support-label">{t('header.support')}</span>
         </button>
       </div>
     </header>

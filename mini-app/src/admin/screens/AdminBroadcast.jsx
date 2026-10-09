@@ -12,7 +12,6 @@ export default function AdminBroadcast() {
   const [products, setProducts] = useState(null);
   const [productId, setProductId] = useState('');
   const [text, setText] = useState('');
-  const [withButton, setWithButton] = useState(true);
   const [buttonLabel, setButtonLabel] = useState('🛍 Открыть магазин');
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
@@ -31,7 +30,6 @@ export default function AdminBroadcast() {
     const product = (products || []).find((p) => p.id === id);
     if (!product) return;
     setText(`🔥 «${product.title}» снова в наличии!\n\nУспей забронировать по $${product.price.toFixed(2)}.`);
-    setWithButton(true);
     setButtonLabel('Открыть товар');
   };
 
@@ -52,7 +50,7 @@ export default function AdminBroadcast() {
     try {
       const res = await adminApi.broadcast({
         text: text.trim(),
-        buttonLabel: withButton ? buttonLabel.trim() || undefined : undefined,
+        buttonLabel: buttonLabel.trim() || undefined,
         productId: productId || undefined,
       });
       setResult(res);
@@ -118,34 +116,33 @@ export default function AdminBroadcast() {
         />
       </label>
 
-      <label className="admin-field" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <input type="checkbox" checked={withButton} onChange={(e) => setWithButton(e.target.checked)} />
-        <span className="admin-field__label" style={{ margin: 0 }}>
-          Добавить кнопку под сообщением
+      <label className="admin-field">
+        <span className="admin-field__label">Текст кнопки под сообщением</span>
+        <input
+          className="text-input"
+          value={buttonLabel}
+          onChange={(e) => setButtonLabel(e.target.value)}
+          placeholder="Открыть магазин"
+        />
+        <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
+          Кнопка откроет {productId ? 'страницу выбранного товара' : 'магазин'} в мини-приложении. Оставьте поле
+          пустым, если кнопка не нужна.
         </span>
       </label>
 
-      {withButton && (
-        <label className="admin-field">
-          <span className="admin-field__label">Текст кнопки</span>
-          <input
-            className="text-input"
-            value={buttonLabel}
-            onChange={(e) => setButtonLabel(e.target.value)}
-            placeholder="Открыть магазин"
-          />
-          <span className="hint-text" style={{ textAlign: 'left', display: 'block', marginTop: 6 }}>
-            Кнопка откроет {productId ? 'страницу выбранного товара' : 'магазин'} в мини-приложении.
-          </span>
-        </label>
-      )}
-
       {error && <p className="confirm-sheet__warning">{error}</p>}
       {result && (
-        <p className="hint-text" style={{ color: 'var(--success)' }}>
-          Готово: доставлено {result.sent} из {result.total}
-          {result.failed > 0 && ` (не доставлено: ${result.failed} — бот заблокирован или аккаунт удалён)`}
-        </p>
+        <>
+          <p className="hint-text" style={{ color: 'var(--success)' }}>
+            Готово: доставлено {result.sent} из {result.total}
+            {result.failed > 0 && ` (не доставлено: ${result.failed})`}
+          </p>
+          {result.sampleErrors?.length > 0 && (
+            <p className="hint-text" style={{ textAlign: 'left' }}>
+              Пример причины недоставки: {result.sampleErrors[0]}
+            </p>
+          )}
+        </>
       )}
 
       <button className="btn btn--primary btn--block" style={{ marginTop: 10 }} onClick={handleSend} disabled={sending}>

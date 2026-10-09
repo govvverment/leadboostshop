@@ -1,47 +1,24 @@
-import { Image } from 'https://deno.land/x/imagescript@1.3.0/mod.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import { corsHeaders, withCors } from '../_shared/cors.ts';
 import { requireAdminSession } from '../_shared/adminAuth.ts';
+import { optimizeImageBacklog } from '../_shared/optimizeBacklog.ts';
 
 // POST { token в заголовке Authorization, action, ...данные }
 // action: 'list' | 'create' | 'update' | 'archive' | 'restore' | 'delete' |
 //   'list-inventory' | 'bulk-add-inventory' | 'add-file-inventory' |
-//   'clear-inventory' | 'optimize-images' | ...категории
+//   'clear-inventory' | 'delete-inventory-item' | 'optimize-images' |
+//   'find-user-by-telegram' | 'credit-balance' | 'list-orders' |
+//   'list-networks' | 'create-network' | 'update-network' | 'delete-network' |
+//   ...категории
 
-// Та же логика сжатия, что и в admin-upload — но применяется задним
-// числом к уже загруженным картинкам. Сжатие при загрузке (admin-upload)
-// работает только для НОВЫХ файлов; товары/категории, картинки которых
-// были загружены до появления этой логики, остались большими и поэтому
-// заметно медленнее грузятся в приложении (в частности — иконки в
-// "Новостной ленте"). 'optimize-images' один раз проходит по всем уже
-// сохранённым картинкам и пересжимает те, что того стоят.
-const MAX_DIMENSION = 480;
-const JPEG_QUALITY = 82;
-// Файлы легче этого порога уже не переживём — трогать их незачем.
-const OPTIMIZE_SKIP_UNDER_BYTES = 60 * 1024;
-
-async function recompress(
-  bytes: Uint8Array,
-  contentTypeHint: string
-): Promise<{ bytes: Uint8Array; contentType: string; ext: string } | null> {
-  try {
-    const image = await Image.decode(bytes);
-    let resized = false;
-    if (image.width > MAX_DIMENSION || image.height > MAX_DIMENSION) {
-      if (image.width >= image.height) image.resize(MAX_DIMENSION, Image.RESIZE_AUTO);
-      else image.resize(Image.RESIZE_AUTO, MAX_DIMENSION);
-      resized = true;
-    }
-    const isPng = contentTypeHint === 'image/png';
-    const outBytes = isPng ? await image.encode() : await image.encodeJPEG(JPEG_QUALITY);
-    // Не изменили размеры и пересжатая версия не легче оригинала —
-    // пересжимать не имело смысла, оставляем как есть.
-    if (!resized && outBytes.length >= bytes.length) return null;
-    return { bytes: outBytes, contentType: isPng ? 'image/png' : 'image/jpeg', ext: isPng ? 'png' : 'jpg' };
-  } catch {
-    return null; // битый/нераспознанный формат — не трогаем
-  }
-}
+// Пересжатие уже загруженных картинок вынесено в
+// _shared/optimizeBacklog.ts — той же функцией теперь пользуется и этот
+// action ('optimize-images', срабатывает когда админ открывает раздел
+// "Товары"), и новая edge-функция cron-optimize-images (срабатывает САМА,
+// по расписанию через pg_cron — см. миграцию *_autonomous_image_
+// optimization.sql). Раньше пересжатие полностью зависело от того, что
+// кто-то откроет "Товары" в браузере — если этого не происходило, оно
+// просто ни разу не срабатывало. Теперь это не единственный путь.
 
 function mapProduct(row: Record<string, unknown>) {
   return {
@@ -62,6 +39,8 @@ function mapProduct(row: Record<string, unknown>) {
     period: row.period,
     periodLabel: row.period_label,
     isArchived: Boolean(row.is_archived),
+    managerOrder: Boolean(row.manager_order),
+    manualStock: Boolean(row.manual_stock),
   };
 }
 
@@ -177,7 +156,11 @@ Deno.serve(async (req) => {
       if (error) return withCors({ error: error.message }, 500);
 
       // Живой остаток аккаунтов — реальное количество свободных на
-      // складе, а не ручная (уже устаревшая) цифра из products.stock
+      // складе, а не ручная (уже устаревшая) цифра из products.stock.
+      // Исключение — товары с manual_stock: у них СВОЙ смысл у
+      // products.stock (см. миграцию *_manual_account_stock.sql), реального
+      // склада может вообще не быть, и живой подсчёт по account_inventory
+      // здесь всегда дал бы 0.
       const { data: counts } = await supabase
         .from('account_inventory')
         .select('product_id')
@@ -190,7 +173,10 @@ Deno.serve(async (req) => {
       return withCors(
         data.map((row) => {
           const mapped = mapProduct(row);
-          if (['account', 'one-time', 'subscription'].includes(mapped.kind)) mapped.stock = liveStock.get(row.id) ?? 0;
+          const isManualAccount = mapped.kind === 'account' && mapped.manualStock;
+          if (!isManualAccount && ['account', 'one-time', 'subscription'].includes(mapped.kind)) {
+            mapped.stock = liveStock.get(row.id) ?? 0;
+          }
           return mapped;
         })
       );
@@ -230,25 +216,36 @@ Deno.serve(async (req) => {
       }
 
       // Автоподхват иконки: если это аккаунт с указанной соцсетью, но без
-      // своей картинки — берём картинку с любого уже существующего товара
-      // той же соцсети (обычно это и есть логотип соцсети, один раз
-      // загруженный админом вручную). Экономит повторную загрузку одной и
-      // той же картинки на каждый новый аккаунт этой соцсети — иконка
-      // "наследуется" автоматически. Явно переданная imageUrl (например,
-      // при редактировании с уже загруженным фото) в приоритете и это
-      // правило не переопределяет.
+      // своей картинки — сначала смотрим в справочник networks (там
+      // админ явно сохраняет иконку на каждую соцсеть, см. add-network/
+      // update-network), а если там иконки ещё нет — как раньше,
+      // подбираем картинку с любого уже существующего товара той же
+      // соцсети. Обычно фронт (AdminProductForm) уже сам подставляет
+      // imageUrl из networks при выборе соцсети — это просто подстраховка
+      // на случай прямого вызова API. Явно переданная imageUrl в
+      // приоритете и это правило не переопределяет.
       let imageUrl = body.imageUrl ?? null;
       if (!imageUrl && body.kind === 'account' && body.network) {
-        const { data: sibling } = await supabase
-          .from('products')
-          .select('image_url')
-          .eq('kind', 'account')
-          .eq('network', body.network)
-          .not('image_url', 'is', null)
-          .order('created_at', { ascending: false })
-          .limit(1)
+        const { data: net } = await supabase
+          .from('networks')
+          .select('icon_url')
+          .ilike('title', String(body.network))
+          .not('icon_url', 'is', null)
           .maybeSingle();
-        if (sibling?.image_url) imageUrl = sibling.image_url;
+        if (net?.icon_url) {
+          imageUrl = net.icon_url;
+        } else {
+          const { data: sibling } = await supabase
+            .from('products')
+            .select('image_url')
+            .eq('kind', 'account')
+            .eq('network', body.network)
+            .not('image_url', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (sibling?.image_url) imageUrl = sibling.image_url;
+        }
       }
 
       const { error: dbError } = await supabase.from('products').insert({
@@ -264,10 +261,12 @@ Deno.serve(async (req) => {
         platform: body.platform ?? null,
         type: body.type ?? null,
         network: body.kind === 'account' ? body.network ?? null : null,
-        stock: body.kind === 'account' ? body.stock ?? 0 : null,
+        stock: body.kind === 'account' ? Number(body.stock) || 0 : null,
         license: body.kind === 'one-time' ? body.license ?? null : null,
         period: body.kind === 'subscription' ? body.period ?? 'мес' : null,
         period_label: body.kind === 'subscription' ? body.periodLabel ?? '1 месяц' : null,
+        manager_order: Boolean(body.managerOrder),
+        manual_stock: body.kind === 'account' ? Boolean(body.manualStock) : false,
       });
       if (dbError) return withCors({ error: dbError.message }, 500);
 
@@ -278,6 +277,20 @@ Deno.serve(async (req) => {
           // не смог записаться.
           await supabase.from('products').delete().eq('id', id);
           return withCors({ error: inventoryError.message }, 500);
+        }
+      }
+
+      // Товар с ручным складом (manual_stock) создаётся сразу с каким-то
+      // количеством — но, в отличие от account_inventory (обычный склад),
+      // это НЕ строки в отдельной таблице, а просто число в products.stock.
+      // Новостная лента ("recent_restocks") раньше строилась только из
+      // account_inventory и такие товары никогда в неё не попадали, даже
+      // при создании с полным количеством сразу — пишем явное событие
+      // пополнения, чтобы админ и покупатели видели его в ленте.
+      if (body.kind === 'account' && Boolean(body.manualStock)) {
+        const qty = Number(body.stock) || 0;
+        if (qty > 0) {
+          await supabase.from('restock_events').insert({ product_id: id, qty_added: qty });
         }
       }
 
@@ -301,6 +314,10 @@ Deno.serve(async (req) => {
       const pick = (key: string, dbKey?: string) =>
         key in body ? body[key] : (existing as Record<string, unknown>)[dbKey ?? key];
 
+      const newKind = pick('kind') as string;
+      const newManualStock = 'manualStock' in body ? Boolean(body.manualStock) : Boolean((existing as Record<string, unknown>).manual_stock);
+      const newStockValue = pick('stock');
+
       const { error: dbError } = await supabase
         .from('products')
         .update({
@@ -315,13 +332,30 @@ Deno.serve(async (req) => {
           platform: pick('platform'),
           type: pick('type'),
           network: pick('network'),
-          stock: pick('stock'),
+          stock: newStockValue,
           license: pick('license'),
           period: pick('period'),
           period_label: pick('periodLabel', 'period_label'),
+          manager_order: 'managerOrder' in body ? Boolean(body.managerOrder) : (existing as Record<string, unknown>).manager_order,
+          manual_stock: newManualStock,
         })
         .eq('id', body.id);
       if (dbError) return withCors({ error: dbError.message }, 500);
+
+      // Тот же случай, что и при создании (см. комментарий в action
+      // 'create') — только тут ещё нужно сравнить со СТАРЫМ количеством:
+      // пишем событие в ленту, только если товар реально пополнили
+      // (stock вырос), а не просто пересохранили форму или продали пару
+      // штук (продажа уменьшает stock через purchase_product() — не
+      // отсюда, эта ветка её не видит и под "рост" не попадает).
+      if (newKind === 'account' && newManualStock) {
+        const oldStock = Number((existing as Record<string, unknown>).stock) || 0;
+        const newStock = Number(newStockValue) || 0;
+        const delta = newStock - oldStock;
+        if (delta > 0) {
+          await supabase.from('restock_events').insert({ product_id: body.id, qty_added: delta });
+        }
+      }
 
       const { data } = await supabase.from('products').select('*').eq('id', body.id).single();
       return withCors(mapProduct(data));
@@ -411,7 +445,11 @@ Deno.serve(async (req) => {
     // bulk-add-inventory (текст). Файлы уже должны быть загружены в
     // приватный бакет account-files через admin-upload-account-file,
     // сюда приходят только их пути — по одному account_inventory на
-    // файл (1 zip = 1 аккаунт). Доступно только для kind='account'.
+    // файл (1 zip = 1 единица товара). Доступно для kind='account' И
+    // kind='one-time' (категория "Технические решения" идёт по
+    // one-time — формат "1 zip = 1 товар = 1 единица склада"), но не
+    // для 'subscription' — у подписок другой, накопительный флоу
+    // выдачи (см. purchase_product()).
     if (action === 'add-file-inventory') {
       if (!body.productId) return withCors({ error: 'productId обязателен' }, 400);
       if (!Array.isArray(body.files) || body.files.length === 0) {
@@ -424,8 +462,8 @@ Deno.serve(async (req) => {
         .eq('id', body.productId)
         .single();
       if (productError) return withCors({ error: productError.message }, 500);
-      if (product.kind !== 'account') {
-        return withCors({ error: 'Загрузка .zip доступна только для товаров типа "Аккаунт"' }, 400);
+      if (product.kind !== 'account' && product.kind !== 'one-time') {
+        return withCors({ error: 'Загрузка .zip доступна только для товаров типа "Аккаунт" и "Разовая покупка"' }, 400);
       }
 
       const rows = body.files
@@ -459,73 +497,148 @@ Deno.serve(async (req) => {
       return withCors({ removed: count ?? 0 });
     }
 
-    // Пересжать уже загруженные картинки товаров и категорий (см.
-    // комментарий у recompress() наверху файла). Идём по каждой ссылке
-    // последовательно: скачиваем, при необходимости сжимаем, заливаем
-    // как новый файл в тот же bucket и переключаем image_url в БД на
-    // него. Старый файл в Storage не трогаем (не критично место, зато
-    // исключён риск сломать что-то, что на него ещё смотрит).
+    // Удалить ОДНУ конкретную единицу склада (одну строку
+    // account_inventory) по id — в отличие от clear-inventory (bulk),
+    // здесь можно убрать один конкретный ещё не проданный аккаунт/ссылку/
+    // zip, не трогая остальной склад товара. Проданные строки тоже можно
+    // удалять (просто чистка истории — сама покупка и её credentials уже
+    // сохранены отдельно, в purchases, и не пострадают).
+    if (action === 'delete-inventory-item') {
+      if (!body.id) return withCors({ error: 'id обязателен' }, 400);
+      const { data, error } = await supabase
+        .from('account_inventory')
+        .delete()
+        .eq('id', body.id)
+        .select('id')
+        .maybeSingle();
+      if (error) return withCors({ error: error.message }, 500);
+      if (!data) return withCors({ error: 'Позиция склада не найдена' }, 404);
+      return withCors({ ok: true });
+    }
+
+    // ------------------------------------------------------------
+    // Ручное начисление/списание баланса по Telegram ID — двухшаговый
+    // UI в админке: сначала find-user-by-telegram (показать админу, кого
+    // он собирается пополнить — имя/username/текущий баланс, чтобы не
+    // ошибиться ID), затем credit-balance с уже подтверждённой суммой.
+    // ------------------------------------------------------------
+    if (action === 'find-user-by-telegram') {
+      const telegramId = Number(body.telegramId);
+      if (!Number.isFinite(telegramId)) return withCors({ error: 'Некорректный Telegram ID' }, 400);
+      const { data, error } = await supabase
+        .from('users')
+        .select('telegram_id, username, first_name, balance')
+        .eq('telegram_id', telegramId)
+        .maybeSingle();
+      if (error) return withCors({ error: error.message }, 500);
+      if (!data) return withCors({ error: 'Пользователь с таким Telegram ID не найден' }, 404);
+      return withCors({
+        telegramId: data.telegram_id,
+        username: data.username,
+        firstName: data.first_name,
+        balance: Number(data.balance),
+      });
+    }
+
+    if (action === 'credit-balance') {
+      const telegramId = Number(body.telegramId);
+      const amount = Number(body.amount);
+      if (!Number.isFinite(telegramId)) return withCors({ error: 'Некорректный Telegram ID' }, 400);
+      if (!Number.isFinite(amount) || amount === 0) return withCors({ error: 'Сумма должна быть ненулевым числом' }, 400);
+
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('balance')
+        .eq('telegram_id', telegramId)
+        .maybeSingle();
+      if (userError) return withCors({ error: userError.message }, 500);
+      if (!user) return withCors({ error: 'Пользователь с таким Telegram ID не найден' }, 404);
+
+      const newBalance = Number((Number(user.balance) + amount).toFixed(2));
+      const { error: updError } = await supabase
+        .from('users')
+        .update({ balance: newBalance })
+        .eq('telegram_id', telegramId);
+      if (updError) return withCors({ error: updError.message }, 500);
+
+      const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim() : null;
+      await supabase.from('balance_history').insert({
+        id: 'h_' + crypto.randomUUID().replace(/-/g, ''),
+        user_id: telegramId,
+        type: amount > 0 ? 'admin_credit' : 'admin_debit',
+        title: amount > 0 ? 'Начисление администратором' : 'Списание администратором',
+        meta: note,
+        amount,
+        status: 'success',
+      });
+
+      return withCors({ ok: true, balance: newBalance });
+    }
+
+    // Заказы, направленные на менеджера (товары с галочкой
+    // "Направлять к менеджеру") — чтобы админ видел номер заказа и мог
+    // сверить его с тем, что покупатель напишет в личку. Берём и из
+    // purchases (account/one-time), и из subscriptions (подписки) —
+    // в обеих таблицах order_number проставляется одной и той же
+    // purchase_product().
+    if (action === 'list-orders') {
+      const { data: fromPurchases, error: purchasesError } = await supabase
+        .from('purchases')
+        .select('id, user_id, product_id, title, kind, price, order_number, created_at')
+        .not('order_number', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (purchasesError) return withCors({ error: purchasesError.message }, 500);
+
+      const { data: fromSubs, error: subsError } = await supabase
+        .from('subscriptions')
+        .select('id, user_id, product_id, title, price, order_number, created_at')
+        .not('order_number', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (subsError) return withCors({ error: subsError.message }, 500);
+
+      const combined = [
+        ...(fromPurchases ?? []).map((r) => ({ ...r, source: 'purchase' })),
+        ...(fromSubs ?? []).map((r) => ({ ...r, kind: 'subscription', source: 'subscription' })),
+      ].sort((a, b) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime());
+
+      const userIds = [...new Set(combined.map((r) => r.user_id as number))];
+      const { data: users } = userIds.length
+        ? await supabase.from('users').select('telegram_id, username, first_name').in('telegram_id', userIds)
+        : { data: [] };
+      const userMap = new Map((users ?? []).map((u) => [u.telegram_id, u]));
+
+      return withCors(
+        combined.map((r) => {
+          const u = userMap.get(r.user_id as number);
+          return {
+            id: r.id,
+            orderNumber: r.order_number,
+            productTitle: r.title,
+            kind: r.kind,
+            price: Number(r.price),
+            userTelegramId: r.user_id,
+            username: u?.username ?? null,
+            firstName: u?.first_name ?? null,
+            createdAt: r.created_at,
+          };
+        })
+      );
+    }
+
+    // Пересжать уже загруженные картинки товаров и категорий — сама
+    // логика в _shared/optimizeBacklog.ts (см. комментарий там же и
+    // наверху этого файла). Этот action запускается, когда админ
+    // открывает раздел "Товары"; та же работа теперь ЕЩЁ и происходит
+    // сама по расписанию (cron-optimize-images).
     if (action === 'optimize-images') {
-      const { data: prods, error: prodsError } = await supabase.from('products').select('id, image_url');
-      if (prodsError) return withCors({ error: prodsError.message }, 500);
-      const { data: cats, error: catsError } = await supabase.from('categories').select('id, image_url');
-      if (catsError) return withCors({ error: catsError.message }, 500);
-
-      const targets: { table: 'products' | 'categories'; id: string; url: string }[] = [];
-      for (const p of prods ?? []) if (p.image_url) targets.push({ table: 'products', id: p.id, url: p.image_url });
-      for (const c of cats ?? []) if (c.image_url) targets.push({ table: 'categories', id: c.id, url: c.image_url });
-
-      let optimized = 0;
-      let skipped = 0;
-      let failed = 0;
-      let bytesBefore = 0;
-      let bytesAfter = 0;
-
-      for (const t of targets) {
-        try {
-          const res = await fetch(t.url);
-          if (!res.ok) {
-            failed++;
-            continue;
-          }
-          const contentType = res.headers.get('content-type') || 'image/jpeg';
-          const original = new Uint8Array(await res.arrayBuffer());
-          if (original.length <= OPTIMIZE_SKIP_UNDER_BYTES) {
-            skipped++;
-            continue;
-          }
-
-          const result = await recompress(original, contentType);
-          if (!result) {
-            skipped++;
-            continue;
-          }
-
-          const path = `${crypto.randomUUID()}.${result.ext}`;
-          const { error: upErr } = await supabase.storage
-            .from('product-images')
-            .upload(path, result.bytes, { contentType: result.contentType, cacheControl: '31536000' });
-          if (upErr) {
-            failed++;
-            continue;
-          }
-
-          const { data: pub } = supabase.storage.from('product-images').getPublicUrl(path);
-          const { error: dbErr } = await supabase.from(t.table).update({ image_url: pub.publicUrl }).eq('id', t.id);
-          if (dbErr) {
-            failed++;
-            continue;
-          }
-
-          bytesBefore += original.length;
-          bytesAfter += result.bytes.length;
-          optimized++;
-        } catch {
-          failed++;
-        }
+      try {
+        const stats = await optimizeImageBacklog(supabase);
+        return withCors(stats);
+      } catch (err) {
+        return withCors({ error: err instanceof Error ? err.message : String(err) }, 500);
       }
-
-      return withCors({ total: targets.length, optimized, skipped, failed, bytesBefore, bytesAfter });
     }
 
     // Категории — картинка для карточки на главной. Создаются и
@@ -573,6 +686,44 @@ Deno.serve(async (req) => {
       }
 
       const { error } = await supabase.from('categories').delete().eq('id', body.id);
+      if (error) return withCors({ error: error.message }, 500);
+      return withCors({ ok: true });
+    }
+
+    // Справочник соцсетей — иконка на каждую, чтобы форма товара могла
+    // подставлять её автоматически при выборе соцсети (см. AdminProductForm
+    // и автоподхват иконки в create() выше). Тот же CRUD-паттерн, что и
+    // у категорий.
+    if (action === 'list-networks') {
+      const { data, error } = await supabase.from('networks').select('id, title, icon_url').order('title');
+      if (error) return withCors({ error: error.message }, 500);
+      return withCors(data.map((row: Record<string, unknown>) => ({ id: row.id, title: row.title, iconUrl: row.icon_url })));
+    }
+
+    if (action === 'create-network') {
+      const title = typeof body.title === 'string' ? body.title.trim() : '';
+      if (!title) return withCors({ error: 'Название соцсети обязательно' }, 400);
+
+      const id = title
+        .toLowerCase()
+        .replace(/[^a-z0-9а-яё]+/gi, '-')
+        .replace(/^-+|-+$/g, '') || `net-${crypto.randomUUID().slice(0, 8)}`;
+
+      const { error } = await supabase.from('networks').insert({ id, title, icon_url: body.iconUrl ?? null });
+      if (error) return withCors({ error: error.message }, 500);
+      return withCors({ id, title, iconUrl: body.iconUrl ?? null }, 201);
+    }
+
+    if (action === 'update-network') {
+      if (!body.id) return withCors({ error: 'id обязателен' }, 400);
+      const { error } = await supabase.from('networks').update({ icon_url: body.iconUrl ?? null }).eq('id', body.id);
+      if (error) return withCors({ error: error.message }, 500);
+      return withCors({ ok: true });
+    }
+
+    if (action === 'delete-network') {
+      if (!body.id) return withCors({ error: 'id обязателен' }, 400);
+      const { error } = await supabase.from('networks').delete().eq('id', body.id);
       if (error) return withCors({ error: error.message }, 500);
       return withCors({ ok: true });
     }

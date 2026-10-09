@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Screen from '../../components/Screen';
 import EmptyState from '../../components/EmptyState';
 import Icon from '../../components/Icon';
+import ProductImage from '../../components/ProductImage';
 import { useApp } from '../../context/AppContext';
 
 const ICONS = { deposit: 'download', purchase: 'bag', subscription: 'code', referral: 'people' };
@@ -83,9 +84,15 @@ export default function BalanceHistory() {
             <div className="list">
               {g.items.map((h) => (
                 <div key={h.id} className="history-row">
-                  <span className={'history-row__icon' + (h.amount > 0 ? ' history-row__icon--success' : '')}>
-                    <Icon name={ICONS[h.type] ?? 'bag'} size={16} />
-                  </span>
+                  {h.imageUrl ? (
+                    <span className="history-row__icon history-row__icon--photo">
+                      <ProductImage product={{ imageUrl: h.imageUrl, kind: 'account' }} size={34} />
+                    </span>
+                  ) : (
+                    <span className={'history-row__icon' + (h.amount > 0 ? ' history-row__icon--success' : '')}>
+                      <Icon name={ICONS[h.type] ?? 'bag'} size={16} />
+                    </span>
+                  )}
                   <div className="list-row__body">
                     <span className="list-row__title">{h.title}</span>
                     <span className="list-row__meta">{h.meta}</span>

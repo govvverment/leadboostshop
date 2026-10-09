@@ -27,7 +27,7 @@ async function sendOne(
   chatId: number,
   text: string,
   button?: { label: string; url: string }
-): Promise<boolean> {
+): Promise<{ ok: boolean; error?: string }> {
   const body: Record<string, unknown> = { chat_id: chatId, text };
   if (button) {
     body.reply_markup = { inline_keyboard: [[{ text: button.label, web_app: { url: button.url } }]] };
@@ -41,9 +41,23 @@ async function sendOne(
     // Частая причина неуспеха — пользователь заблокировал бота (403) или
     // деактивировал аккаунт: это не ошибка на нашей стороне, просто
     // считаем как "не доставлено" и идём дальше, не прерывая рассылку.
-    return res.ok;
-  } catch {
-    return false;
+    // НО: раньше сам факт неуспеха проглатывался целиком (только true/
+    // false) — если, например, сама inline-кнопка (web_app) была бы
+    // невалидна для ВСЕХ получателей разом (например, домен в
+    // MINI_APP_URL не совпадает с тем, что зарегистрирован у бота),
+    // это выглядело бы как "рассылка не работает", а причина никогда не
+    // всплывала. Теперь при неуспехе читаем текст ошибки от Telegram.
+    if (res.ok) return { ok: true };
+    let description = `HTTP ${res.status}`;
+    try {
+      const data = await res.json();
+      if (data?.description) description = data.description;
+    } catch {
+      // тело не JSON — оставляем HTTP-статус как есть
+    }
+    return { ok: false, error: description };
+  } catch (err) {
+    return { ok: false, error: String(err) };
   }
 }
 
@@ -76,20 +90,24 @@ Deno.serve(async (req) => {
     const ids = (users ?? []).map((u: { telegram_id: number }) => u.telegram_id);
     let sent = 0;
     let failed = 0;
+    const sampleErrors: string[] = [];
 
     for (let i = 0; i < ids.length; i += BATCH_SIZE) {
       const batch = ids.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(batch.map((id) => sendOne(botToken, id, text, button)));
-      for (const ok of results) {
-        if (ok) sent++;
-        else failed++;
+      for (const r of results) {
+        if (r.ok) sent++;
+        else {
+          failed++;
+          if (r.error && sampleErrors.length < 3 && !sampleErrors.includes(r.error)) sampleErrors.push(r.error);
+        }
       }
       if (i + BATCH_SIZE < ids.length) {
         await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
       }
     }
 
-    return withCors({ total: ids.length, sent, failed });
+    return withCors({ total: ids.length, sent, failed, sampleErrors });
   } catch (err) {
     return withCors({ error: String(err) }, 400);
   }

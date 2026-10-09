@@ -1,3 +1,5 @@
+import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
+
 // Webhook для самого Telegram-бота (не Mini App). Нужен ТОЛЬКО для
 // одной вещи: когда пользователь впервые нажимает "Start" по
 // реферальной ссылке (t.me/bot?start=ref_123), обычная Direct Link
@@ -7,6 +9,15 @@
 // реферальный параметр уже вшит как обычный ?ref=... — Telegram
 // сохраняет query-строку web_app-кнопки и отдаёт её в window.location
 // внутри Mini App, это не зависит от капризов start_param.
+
+// Плюс вторая вещь, добавленная позже: отслеживание блокировки бота
+// пользователем — Telegram сам присылает сюда my_chat_member-апдейт,
+// когда пользователь блокирует/разблокирует бота (в приватном чате
+// статус самого бота меняется на 'kicked' / обратно на 'member'). Это
+// приходит по умолчанию, без явной настройки allowed_updates в
+// setWebhook. См. также admin-stats action 'refresh-blocked' — ручной
+// пересчёт по кнопке в админке, бэкафилл для случаев, которые вебхук
+// мог пропустить.
 
 // Оба значения — свои для каждого развёртывания, задаются как секреты
 // (см. supabase secrets set MINI_APP_URL=... / BOT_WEBHOOK_URL=...),
@@ -46,6 +57,25 @@ Deno.serve(async (req) => {
 
   try {
     const update = await req.json();
+
+    // my_chat_member — статус самого бота в приватном чате поменялся:
+    // 'kicked' = пользователь заблокировал бота, 'member' = открыл/
+    // разблокировал заново. Другие статусы ('left' и т.п.) в приватных
+    // чатах с ботом практически не встречаются — не трогаем флаг.
+    const myChatMember = update.my_chat_member;
+    if (myChatMember?.chat?.type === 'private') {
+      const newStatus: string | undefined = myChatMember.new_chat_member?.status;
+      const userId = myChatMember.chat.id;
+      if (userId && (newStatus === 'kicked' || newStatus === 'member')) {
+        const supabase = supabaseAdmin();
+        await supabase
+          .from('users')
+          .update({ bot_blocked: newStatus === 'kicked', bot_blocked_checked_at: new Date().toISOString() })
+          .eq('telegram_id', userId);
+      }
+      return new Response('ok');
+    }
+
     const message = update.message;
     const text: string | undefined = message?.text;
     const chatId = message?.chat?.id;

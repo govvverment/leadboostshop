@@ -454,3 +454,6 @@ verify_jwt = false
 
 [functions.admin-broadcast]
 verify_jwt = false
+
+[functions.cron-optimize-images]
+verify_jwt = false

@@ -31,6 +31,38 @@ export default function AdminProductsList() {
 
   useEffect(load, []);
 
+  // Пересжатие старых тяжёлых картинок по-прежнему тихо запускается на
+  // фоне при каждом заходе в раздел "Товары" (ошибку здесь не показываем
+  // специально — это фоновая уборка, а не действие админа). НО раньше
+  // это был ЕДИНСТВЕННЫЙ способ её запустить, и результат нигде не было
+  // видно — даже если она реально отрабатывала, нельзя было проверить,
+  // сколько картинок сжалось, а сколько упало с ошибкой (и с какой).
+  // Кнопка ниже — тот же самый action, но с видимым результатом, чтобы
+  // можно было убедиться, что бэкенд реально это делает, а не просто
+  // "должен".
+  useEffect(() => {
+    adminApi.optimizeImages().catch(() => {});
+  }, []);
+
+  const runOptimizeImages = async () => {
+    setOptimizing(true);
+    setOptimizeResult(null);
+    setError(null);
+    try {
+      const res = await adminApi.optimizeImages();
+      const savedKb = Math.round(((res.bytesBefore ?? 0) - (res.bytesAfter ?? 0)) / 1024);
+      setOptimizeResult(
+        `Проверено: ${res.total}. Сжато: ${res.optimized}, уже лёгких: ${res.skipped}, ошибок: ${res.failed}` +
+          (res.optimized ? `. Экономия: ~${savedKb} КБ` : '')
+      );
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
   const toggleArchive = async (product) => {
     setBusyId(product.id);
     try {
@@ -63,27 +95,6 @@ export default function AdminProductsList() {
       setError(err.message);
     } finally {
       setDeletingId(null);
-    }
-  };
-
-  // Пересжимает задним числом картинки товаров/категорий, загруженные
-  // ДО того, как появилось автосжатие при загрузке (см. admin-upload) —
-  // именно из-за таких "старых" тяжёлых картинок иконки на главной
-  // (в частности в "Новостной ленте") могли грузиться заметно медленнее,
-  // чем всё остальное. Разовое действие, можно жать сколько угодно раз —
-  // уже лёгкие картинки просто пропускаются.
-  const optimizeImages = async () => {
-    setOptimizing(true);
-    setError(null);
-    setOptimizeResult(null);
-    try {
-      const result = await adminApi.optimizeImages();
-      setOptimizeResult(result);
-      load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setOptimizing(false);
     }
   };
 
@@ -124,22 +135,25 @@ export default function AdminProductsList() {
       <button className="btn btn--primary btn--block" onClick={() => navigate('/admin/products/new')}>
         + Добавить товар
       </button>
-      <button className="btn btn--secondary btn--block" onClick={optimizeImages} disabled={optimizing}>
-        {optimizing ? 'Оптимизация фото...' : 'Оптимизировать все фото'}
+      <div className="admin-quicklinks">
+        <button className="btn btn--secondary" onClick={() => navigate('/admin/balance')}>
+          💰 Баланс
+        </button>
+        <button className="btn btn--secondary" onClick={() => navigate('/admin/orders')}>
+          📋 Заказы
+        </button>
+        <button className="btn btn--secondary" onClick={() => navigate('/admin/networks')}>
+          🌐 Соцсети
+        </button>
+      </div>
+      <button className="btn btn--secondary btn--block" onClick={runOptimizeImages} disabled={optimizing} style={{ marginTop: 8 }}>
+        {optimizing ? 'Сжимаем фото...' : '🖼 Принудительно пересжать все фото'}
       </button>
+      {optimizeResult && <p className="hint-text">{optimizeResult}</p>}
+
       <button className="btn btn--ghost btn--block" onClick={logout}>
         Выйти из админки
       </button>
-
-      {optimizeResult && (
-        <p className="hint-text" style={{ marginTop: 10 }}>
-          Готово: обработано {optimizeResult.optimized} из {optimizeResult.total}
-          {optimizeResult.bytesBefore > 0 &&
-            ` (${(optimizeResult.bytesBefore / 1024).toFixed(0)} КБ → ${(optimizeResult.bytesAfter / 1024).toFixed(0)} КБ)`}
-          {optimizeResult.skipped > 0 && `, уже лёгких: ${optimizeResult.skipped}`}
-          {optimizeResult.failed > 0 && `, не удалось: ${optimizeResult.failed}`}
-        </p>
-      )}
 
       {error && <p className="confirm-sheet__warning" style={{ marginTop: 14 }}>{error}</p>}
 
@@ -159,13 +173,13 @@ export default function AdminProductsList() {
                     <span className="list-row__meta">
                       {KIND_LABELS[p.kind]} · ${p.price.toFixed(2)}
                       {p.period && `/${p.period}`}
-                      {p.kind === 'account' && ` · ${p.stock} шт.`}
+                      {p.kind === 'account' && ` · ${p.stock} шт.${p.manualStock ? ' (вручную)' : ''}`}
                     </span>
                   </div>
                   {p.isArchived && <span className="badge badge--muted">В архиве</span>}
                 </div>
                 <div className="admin-product-row__actions">
-                  {(p.kind === 'account' || p.kind === 'one-time' || p.kind === 'subscription') && (
+                  {(p.kind === 'one-time' || p.kind === 'subscription' || (p.kind === 'account' && !p.manualStock)) && (
                     <button className="btn btn--secondary btn--sm" onClick={() => navigate(`/admin/products/${p.id}/inventory`)}>
                       {p.kind === 'account' ? 'Аккаунты' : 'Ссылки'}
                     </button>

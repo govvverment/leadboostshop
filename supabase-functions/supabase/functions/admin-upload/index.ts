@@ -1,7 +1,7 @@
-import { Image } from 'https://deno.land/x/imagescript@1.3.0/mod.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import { corsHeaders, withCors } from '../_shared/cors.ts';
 import { requireAdminSession } from '../_shared/adminAuth.ts';
+import { compressImage } from '../_shared/imageCompress.ts';
 
 // POST multipart/form-data, поле "image" -> { url }
 
@@ -12,23 +12,12 @@ const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 // ~48-64px (см. ProductImage.jsx), поэтому нет смысла хранить и грузить
 // оригиналы в несколько мегабайт — именно из-за них картинки долго
 // грузились. Сжимаем один раз при загрузке — дальше приложение отдаёт уже
-// лёгкий файл, быстро в любой сети.
-const MAX_DIMENSION = 480;
-const JPEG_QUALITY = 82;
-
+// лёгкий файл, быстро в любой сети. Сама логика сжатия — в
+// _shared/imageCompress.ts (там же объяснение, почему PNG больше не
+// сохраняется как PNG по умолчанию).
 async function compress(file: File): Promise<{ bytes: Uint8Array; contentType: string; ext: string }> {
   try {
-    const image = await Image.decode(new Uint8Array(await file.arrayBuffer()));
-    if (image.width > MAX_DIMENSION || image.height > MAX_DIMENSION) {
-      if (image.width >= image.height) image.resize(MAX_DIMENSION, Image.RESIZE_AUTO);
-      else image.resize(Image.RESIZE_AUTO, MAX_DIMENSION);
-    }
-    // PNG сохраняем как PNG (может быть прозрачность), остальное — в JPEG,
-    // он даёт заметно меньший размер файла для обычных фото.
-    if (file.type === 'image/png') {
-      return { bytes: await image.encode(), contentType: 'image/png', ext: 'png' };
-    }
-    return { bytes: await image.encodeJPEG(JPEG_QUALITY), contentType: 'image/jpeg', ext: 'jpg' };
+    return await compressImage(new Uint8Array(await file.arrayBuffer()), file.type);
   } catch {
     // Не смогли распознать/сжать (редкий/битый формат) — грузим как есть,
     // лучше оригинал, чем ошибка загрузки.

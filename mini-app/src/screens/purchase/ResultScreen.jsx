@@ -1,43 +1,55 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProductImage from '../../components/ProductImage';
 import SheetOverlay from '../../components/SheetOverlay';
+import { trackEvent } from '../../supabase/api';
+import { useLocale } from '../../context/LocaleContext';
 
 export default function ResultScreen({ type }) {
   const navigate = useNavigate();
   const { state } = useLocation();
+  const { t } = useLocale();
   const product = state?.product;
   const qty = state?.qty;
   const total = state?.total;
   const balance = state?.balance;
   const shortfall = Math.max(0, (total ?? product?.price ?? 0) - (balance ?? 0));
 
+  const accountWords = t('result.accountWords');
+  const accountWord = (qty ?? 1) === 1 ? accountWords[0] : accountWords[1];
+
   const config = {
     success: {
       icon: '✓',
       tone: 'success',
-      title: 'Покупка успешная',
+      title: t('result.successTitle'),
       subtitle:
         product?.kind === 'account'
-          ? `${qty ?? 1} ${qty === 1 ? 'аккаунт' : 'аккаунтов'} добавлены в ваши покупки`
-          : 'Товар добавлен в ваши покупки',
-      primary: { label: 'Открыть покупку', onClick: () => navigate('/purchases', { replace: true }) },
-      secondary: { label: 'Продолжить покупки', onClick: () => navigate('/products', { replace: true }) },
+          ? t('result.successSubtitleAccount', { qty: qty ?? 1, word: accountWord })
+          : t('result.successSubtitleOther'),
+      primary: { label: t('result.openPurchase'), onClick: () => navigate('/purchases', { replace: true }) },
+      secondary: { label: t('result.continueShopping'), onClick: () => navigate('/products', { replace: true }) },
     },
     failed: {
       icon: '!',
       tone: 'danger',
-      title: 'Не удалось выполнить покупку',
-      subtitle: 'Произошла ошибка. Попробуйте повторить покупку.',
-      primary: { label: 'Повторить покупку', onClick: () => navigate(-1) },
-      secondary: { label: 'Отменить', onClick: () => navigate('/products', { replace: true }) },
+      title: t('result.failedTitle'),
+      subtitle: t('result.failedSubtitle'),
+      primary: { label: t('result.retryPurchase'), onClick: () => navigate(-1) },
+      secondary: { label: t('result.cancel'), onClick: () => navigate('/products', { replace: true }) },
     },
     insufficient: {
       icon: '!',
       tone: 'danger',
-      title: 'Недостаточно средств',
-      subtitle: 'На балансе недостаточно средств для этой покупки',
-      primary: { label: 'Пополнить баланс', onClick: () => navigate('/balance/deposit', { replace: true }) },
-      secondary: { label: 'Отменить', onClick: () => navigate('/products', { replace: true }) },
+      title: t('result.insufficientTitle'),
+      subtitle: t('result.insufficientSubtitle'),
+      primary: {
+        label: t('result.topUp'),
+        onClick: () => {
+          trackEvent('topup_click');
+          navigate('/balance/deposit', { replace: true });
+        },
+      },
+      secondary: { label: t('result.cancel'), onClick: () => navigate('/products', { replace: true }) },
     },
   }[type];
 
@@ -62,7 +74,7 @@ export default function ResultScreen({ type }) {
             </span>
           </div>
           <span className="sheet-product__price">
-            {qty ? `${qty} шт.` : ''}
+            {qty ? `${qty} ${t('result.pieces')}` : ''}
             <br />${(total ?? product.price).toFixed(2)}
           </span>
         </div>
@@ -72,12 +84,12 @@ export default function ResultScreen({ type }) {
         <div className="detail-list detail-list--flat">
           {balance != null && (
             <div className="detail-list__row">
-              <span>Ваш баланс</span>
+              <span>{t('result.yourBalance')}</span>
               <span>${balance.toFixed(2)}</span>
             </div>
           )}
           <div className="detail-list__row">
-            <span>Не хватает</span>
+            <span>{t('result.shortfall')}</span>
             <span className="detail-list__danger">${shortfall.toFixed(2)}</span>
           </div>
         </div>

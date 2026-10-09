@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { LocaleProvider } from './context/LocaleContext';
 import Toast from './components/Toast';
 import ScrollToTop from './components/ScrollToTop';
 
@@ -41,6 +42,7 @@ import AdminNetworks from './admin/screens/AdminNetworks';
 export default function App() {
   return (
     <ThemeProvider>
+    <LocaleProvider>
     <AppProvider>
       <AdminAuthProvider>
       <ScrollToTop />
@@ -157,6 +159,7 @@ export default function App() {
       <Toast />
       </AdminAuthProvider>
     </AppProvider>
+    </LocaleProvider>
     </ThemeProvider>
   );
 }

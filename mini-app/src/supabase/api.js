@@ -27,6 +27,7 @@ function mapProduct(row) {
     period: row.period,
     periodLabel: row.period_label,
     salesCount: row.sales_count ?? 0,
+    managerOrder: Boolean(row.manager_order),
   };
 }
 
@@ -108,6 +109,14 @@ export function checkDeposit(initData, requestId) {
   return callFunction('deposit-check', { initData, requestId });
 }
 
+// Лёгкий счётчик для статистики в админке ("Открытий сегодня",
+// "Нажатий «Пополнить» сегодня") — без проверки initData, без ответа,
+// чтобы не тормозить основной флоу. Ошибка сети тут не должна ничего
+// ломать пользователю, поэтому глотаем её молча.
+export function trackEvent(type) {
+  callFunction('track-event', { type }).catch(() => {});
+}
+
 // ------------------------------------------------------------
 // Маппинг снимка аккаунта (snake_case из Postgres → camelCase,
 // как уже ожидают существующие экраны mini-app)
@@ -133,6 +142,9 @@ function mapPurchase(row) {
     // пусто — значит покупка сделана до подключения склада, либо это
     // не аккаунт — экран сам покажет подходящий запасной вариант.
     credentials: Array.isArray(row.credentials) ? row.credentials : null,
+    // Номер заказа для товаров с галочкой "Направлять к менеджеру" —
+    // null для обычных покупок.
+    orderNumber: row.order_number ?? null,
   };
 }
 
@@ -153,6 +165,7 @@ function mapSubscription(row) {
     accessLink: row.access_link,
     accessKey: row.access_key,
     accessInstructionsUrl: row.access_instructions_url,
+    orderNumber: row.order_number ?? null,
   };
 }
 
@@ -164,6 +177,7 @@ function mapHistoryEntry(row) {
     meta: row.meta,
     amount: Number(row.amount),
     status: row.status,
+    imageUrl: row.imageUrl ?? null,
     date: new Date(row.created_at),
   };
 }

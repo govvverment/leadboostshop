@@ -6,12 +6,7 @@ import EmptyState from '../../components/EmptyState';
 import SheetOverlay from '../../components/SheetOverlay';
 import PlatformIcon from '../../components/PlatformIcon';
 import { useApp } from '../../context/AppContext';
-
-const KIND_FILTERS = [
-  { id: 'all', label: 'Все' },
-  { id: 'subscription', label: 'Подписка' },
-  { id: 'one-time', label: 'Разово' },
-];
+import { useLocale } from '../../context/LocaleContext';
 
 // Стрелочка для чипов-фильтров (GEO / Тип) — раньше был символ "⌄",
 // но в разных шрифтах/платформах у него разная высота и он "плыл"
@@ -33,12 +28,17 @@ function ChevronIcon() {
   );
 }
 
-const FILTER_LABELS = { geo: 'GEO', type: 'Тип аккаунта' };
-
 export default function CategoryList() {
   const { categoryId } = useParams();
   const { products, categories } = useApp();
   const navigate = useNavigate();
+  const { t } = useLocale();
+  const KIND_FILTERS = [
+    { id: 'all', label: t('category.all') },
+    { id: 'subscription', label: t('category.subscription') },
+    { id: 'one-time', label: t('category.oneTime') },
+  ];
+  const FILTER_LABELS = { geo: t('category.geo'), type: t('category.accountType') };
   const [query, setQuery] = useState('');
   const [kindFilter, setKindFilter] = useState('all'); // категории без GEO (решения/подписки)
   const [geoFilter, setGeoFilter] = useState('all'); // категории с GEO (аккаунты)
@@ -60,7 +60,7 @@ export default function CategoryList() {
   // спозиционированных дропдаунов.
   const [socialOpen, setSocialOpen] = useState(false);
 
-  const title = categories.find((c) => c.id === categoryId)?.title ?? 'Товары';
+  const title = categories.find((c) => c.id === categoryId)?.title ?? t('category.fallbackTitle');
   const items = useMemo(() => products.filter((p) => p.category === categoryId), [categoryId, products]);
   // Категория "про GEO" определяется по факту — есть ли у её товаров
   // заполненное поле GEO, а не по конкретному захардкоженному id.
@@ -138,7 +138,7 @@ export default function CategoryList() {
   return (
     <Screen title={title}>
       <div className="page-head">
-        <button className="page-head__back" onClick={() => navigate(-1)} aria-label="Назад">
+        <button className="page-head__back" onClick={() => navigate(-1)} aria-label={t('category.back')}>
           ‹
         </button>
         <h1 className="page-head__title">{title}</h1>
@@ -148,7 +148,7 @@ export default function CategoryList() {
         <span className="search-bar__icon">⌕</span>
         <input
           className="search-bar__input"
-          placeholder="Найти товар или решение"
+          placeholder={t('category.searchPlaceholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -159,7 +159,7 @@ export default function CategoryList() {
           <>
             <div className="filter-row">
               <button className={'filter-chip' + (allActive ? ' is-active' : '')} onClick={resetAll}>
-                Все
+                {t('category.all')}
               </button>
 
               {geoOptions.length > 0 && (
@@ -167,7 +167,7 @@ export default function CategoryList() {
                   className={'filter-chip filter-chip--icon' + (geoFilter !== 'all' ? ' is-active' : '')}
                   onClick={() => openSheet('geo')}
                 >
-                  <span>{geoFilter === 'all' ? 'GEO' : geoFilter}</span>
+                  <span>{geoFilter === 'all' ? t('category.geo') : geoFilter}</span>
                   <ChevronIcon />
                 </button>
               )}
@@ -177,7 +177,7 @@ export default function CategoryList() {
                   className={'filter-chip filter-chip--icon' + (typeFilter !== 'all' ? ' is-active' : '')}
                   onClick={() => openSheet('type')}
                 >
-                  <span>{typeFilter === 'all' ? 'Тип аккаунта' : typeFilter}</span>
+                  <span>{typeFilter === 'all' ? t('category.accountType') : typeFilter}</span>
                   <ChevronIcon />
                 </button>
               )}
@@ -190,7 +190,7 @@ export default function CategoryList() {
                     setSocialOpen((v) => !v);
                   }}
                 >
-                  <span>{platformFilter === 'all' ? 'Соцсеть' : platformFilter}</span>
+                  <span>{platformFilter === 'all' ? t('category.socialNetwork') : platformFilter}</span>
                   <ChevronIcon />
                 </button>
               )}
@@ -201,10 +201,10 @@ export default function CategoryList() {
                 <button
                   className={'social-shelf__item social-shelf__item--all' + (platformFilter === 'all' ? ' is-active' : '')}
                   onClick={() => setPlatformFilter('all')}
-                  aria-label="Все соцсети"
-                  title="Все"
+                  aria-label={t('category.allSocial')}
+                  title={t('category.all')}
                 >
-                  Все
+                  {t('category.all')}
                 </button>
                 {platformOptions.map((opt) => (
                   <button
@@ -240,7 +240,7 @@ export default function CategoryList() {
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon="⌕" title="Ничего не найдено" subtitle="Попробуйте изменить запрос или фильтр" />
+        <EmptyState icon="⌕" title={t('category.notFound')} subtitle={t('category.notFoundSubtitle')} />
       ) : (
         <div className="product-list">
           {filtered.map((p) => (
@@ -257,7 +257,7 @@ export default function CategoryList() {
               className={'filter-sheet__item' + (activeValue === 'all' ? ' is-active' : '')}
               onClick={() => selectValue('all')}
             >
-              Все
+              {t('category.all')}
             </button>
             {activeOptions.map((opt) => (
               <button

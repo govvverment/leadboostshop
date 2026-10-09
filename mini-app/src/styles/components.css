@@ -105,6 +105,45 @@
   transform: translateX(18px);
 }
 
+/* Переключатель языка (RU/UA/EN) — компактный сегмент-контрол рядом с
+   тумблером темы. */
+.locale-toggle {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 2px;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+.locale-toggle__item {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 5px 7px;
+  border-radius: var(--radius-pill);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.locale-toggle__item.is-active {
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+/* На узких экранах оставляем в кнопке поддержки только иконку — вместе с
+   тумблерами темы и языка на хедер иначе не остаётся места. */
+@media (max-width: 380px) {
+  .app-header__support-label {
+    display: none;
+  }
+  .app-header__support {
+    padding: 7px 9px;
+  }
+}
+
 /* ===== Bottom nav ===== */
 .bottom-nav {
   position: sticky;
@@ -1169,11 +1208,16 @@
   font-size: 13.5px;
   font-weight: 600;
   color: var(--text-primary);
+  /* Длинные цельные строки без пробелов (ссылки, логины, имена файлов —
+     особенно на складе, см. AdminInventory) иначе вылезали за границы
+     карточки вместо переноса на новую строку. */
+  overflow-wrap: anywhere;
 }
 
 .list-row__meta {
   font-size: 12px;
   color: var(--text-tertiary);
+  overflow-wrap: anywhere;
 }
 
 .list-row__amount {
@@ -1446,6 +1490,15 @@
   background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
   background-size: 200% 100%;
   animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+/* Заглушка поверх ещё смонтированного <img>, показывается после
+   тайм-аута загрузки (см. ProductImage.jsx, статус 'timeout'). Сам
+   <img> под ней остаётся в DOM и продолжает грузиться — если он всё же
+   догрузится, onLoad уберёт этот блок и покажет настоящее фото. */
+.product-image__fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
 }
 @keyframes skeleton-pulse {
   0% {
@@ -2222,6 +2275,11 @@ img.qr-card__code {
   background: var(--success-soft);
   color: var(--success);
 }
+.history-row__icon--photo {
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+}
 
 /* Profile card */
 .profile-card {
@@ -2445,12 +2503,36 @@ img.qr-card__code {
   flex-direction: column;
   gap: 2px;
 }
+/* flex:1 без ограничения по минимальной ширине давал кнопкам "плыть" —
+   при 3-4 кнопках в ряд (Аккаунты/Изменить/В архив/Удалить) на узком
+   экране им физически не хватало места под текст, и ряд вылезал за
+   границы карточки. Грид на 2 колонки — кнопки всегда переносятся на
+   вторую строку вместо того, чтобы выталкивать карточку в ширину. */
 .admin-product-row__actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .admin-product-row__actions .btn {
-  flex: 1;
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ряд быстрых ссылок в админке ("Баланс"/"Заказы"/"Соцсети" и т.п.) —
+   растут в 2-3 колонки и переносятся сами, а не толкают экран в ширину. */
+.admin-quicklinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+.admin-quicklinks .btn {
+  flex: 1 1 calc(33% - 6px);
+  min-width: 100px;
 }
 
 .admin-field {

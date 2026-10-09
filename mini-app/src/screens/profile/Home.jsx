@@ -6,6 +6,7 @@ import { useApp } from '../../context/AppContext';
 import { useTelegramUser } from '../../hooks/useTelegramUser';
 import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { openSupportChat } from '../../utils/support';
+import { trackEvent } from '../../supabase/api';
 
 export default function ProfileHome() {
   const navigate = useNavigate();
@@ -46,7 +47,13 @@ export default function ProfileHome() {
       <div className="balance-card">
         <span className="balance-card__label">Баланс</span>
         <span className="balance-card__amount">${balance.toFixed(2)}</span>
-        <button className="btn btn--primary btn--block" onClick={() => navigate('/balance/deposit')}>
+        <button
+          className="btn btn--primary btn--block"
+          onClick={() => {
+            trackEvent('topup_click');
+            navigate('/balance/deposit');
+          }}
+        >
           + Пополнить баланс
         </button>
       </div>

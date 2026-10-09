@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import Screen from '../../components/Screen';
 import { adminApi } from '../api';
 
+// Только цифры, без графиков — по просьбе: график выручки за 14 дней
+// убрали целиком, остались только карточки-числа (плюс два новых:
+// открытия и клики "Пополнить" за сегодня) и текстовые топ-списки
+// (это не графики, просто отсортированные числа).
 const CARDS = [
   { key: 'revenue', label: 'Выручка', format: (v) => `$${v.toFixed(2)}` },
   { key: 'totalOrders', label: 'Заказов', format: (v) => v },
@@ -15,28 +19,45 @@ const CARDS = [
 export default function AdminStats() {
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
-  const [revenueByDay, setRevenueByDay] = useState(null);
+  const [todayEvents, setTodayEvents] = useState(null);
   const [topProducts, setTopProducts] = useState(null);
   const [topReferrers, setTopReferrers] = useState(null);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshHint, setRefreshHint] = useState(null);
 
   useEffect(() => {
-    Promise.all([
-      adminApi.getOverview(),
-      adminApi.getRevenueByDay(14),
-      adminApi.getTopProducts(),
-      adminApi.getTopReferrers(),
-    ])
-      .then(([ov, rev, products, referrers]) => {
+    Promise.all([adminApi.getOverview(), adminApi.getTodayEvents(), adminApi.getTopProducts(), adminApi.getTopReferrers()])
+      .then(([ov, events, products, referrers]) => {
         setOverview(ov);
-        setRevenueByDay(rev);
+        setTodayEvents(events);
         setTopProducts(products);
         setTopReferrers(referrers);
       })
       .catch((err) => setError(err.message));
   }, []);
 
-  const maxRevenue = Math.max(1, ...(revenueByDay || []).map((d) => d.revenue));
+  // Кол-во заблокировавших бота обновляется автоматически "живьём" (см.
+  // bot-webhook), но это не покрывает тех, кто заблокировал бота ещё до
+  // включения отслеживания — по кнопке ниже проходим по всем
+  // пользователям через Bot API и пересчитываем заново.
+  const refreshBlocked = async () => {
+    setRefreshing(true);
+    setRefreshHint(null);
+    setError(null);
+    try {
+      const res = await adminApi.refreshBlockedUsers();
+      setOverview((prev) => (prev ? { ...prev, blockedUsers: res.blocked } : prev));
+      setRefreshHint(
+        `Проверено ${res.total}: заблокировали ${res.blocked}, активны ${res.active}` +
+          (res.unknown ? `, не удалось проверить ${res.unknown}` : '')
+      );
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <Screen title="Админ-панель" withNav={false}>
@@ -73,21 +94,24 @@ export default function AdminStats() {
                 <span className="admin-stat-box__value">{c.format(overview[c.key])}</span>
               </div>
             ))}
+            <div className="admin-stat-box">
+              <span className="admin-stat-box__label">Открытий сегодня</span>
+              <span className="admin-stat-box__value">{todayEvents ? todayEvents.appOpensToday : '—'}</span>
+            </div>
+            <div className="admin-stat-box">
+              <span className="admin-stat-box__label">«Пополнить» сегодня</span>
+              <span className="admin-stat-box__value">{todayEvents ? todayEvents.topupClicksToday : '—'}</span>
+            </div>
+            <div className="admin-stat-box">
+              <span className="admin-stat-box__label">Заблокировали бота</span>
+              <span className="admin-stat-box__value">{overview.blockedUsers ?? 0}</span>
+            </div>
           </div>
 
-          <h3 className="section__title">Выручка за 14 дней</h3>
-          {!revenueByDay || revenueByDay.length === 0 ? (
-            <p className="hint-text">Пока нет данных о продажах</p>
-          ) : (
-            <div className="admin-bar-chart">
-              {revenueByDay.map((d) => (
-                <div className="admin-bar-chart__col" key={d.day} title={`${d.day}: $${d.revenue.toFixed(2)}`}>
-                  <div className="admin-bar-chart__bar" style={{ height: `${(d.revenue / maxRevenue) * 100}%` }} />
-                  <span className="admin-bar-chart__label">{d.day.slice(5)}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <button className="btn btn--secondary btn--block" onClick={refreshBlocked} disabled={refreshing} style={{ marginBottom: 8 }}>
+            {refreshing ? 'Проверяем...' : '🔄 Обновить кол-во заблокировавших'}
+          </button>
+          {refreshHint && <p className="hint-text" style={{ marginBottom: 20 }}>{refreshHint}</p>}
 
           <h3 className="section__title">Топ товаров</h3>
           {!topProducts || topProducts.length === 0 ? (

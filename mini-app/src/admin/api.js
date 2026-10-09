@@ -90,20 +90,40 @@ export const adminApi = {
     callFunction('admin-products', { action: 'add-file-inventory', productId, files }),
 
   getOverview: () => callFunction('admin-stats', { action: 'overview' }),
-  getRevenueByDay: (days = 14) => callFunction('admin-stats', { action: 'revenue-by-day', days }),
   getTopProducts: () => callFunction('admin-stats', { action: 'top-products' }),
   getTopReferrers: () => callFunction('admin-stats', { action: 'top-referrers' }),
+  getTodayEvents: () => callFunction('admin-stats', { action: 'today-events' }),
+  // Ручной пересчёт "кто заблокировал бота" (кнопка "Обновить" в
+  // статистике) — проходит по всем пользователям через Bot API, может
+  // занять время на большой базе, поэтому вызывается только по нажатию.
+  refreshBlockedUsers: () => callFunction('admin-stats', { action: 'refresh-blocked' }),
 
   getInventory: (productId) => callFunction('admin-products', { action: 'list-inventory', productId }),
   bulkAddInventory: (productId, text) =>
     callFunction('admin-products', { action: 'bulk-add-inventory', productId, text }),
 
   clearInventory: (productId, mode) => callFunction('admin-products', { action: 'clear-inventory', productId, mode }),
+  deleteInventoryItem: (id) => callFunction('admin-products', { action: 'delete-inventory-item', id }),
+
+  // Ручной баланс по Telegram ID — сначала находим пользователя (чтобы
+  // админ видел, кого он собирается пополнить), потом уже начисляем.
+  findUserByTelegram: (telegramId) => callFunction('admin-products', { action: 'find-user-by-telegram', telegramId }),
+  creditBalance: (telegramId, amount, note) =>
+    callFunction('admin-products', { action: 'credit-balance', telegramId, amount, note }),
+
+  getOrders: () => callFunction('admin-products', { action: 'list-orders' }),
 
   getCategories: () => callFunction('admin-products', { action: 'list-categories' }),
   createCategory: (title) => callFunction('admin-products', { action: 'create-category', title }),
   updateCategory: (id, imageUrl) => callFunction('admin-products', { action: 'update-category', id, imageUrl }),
   deleteCategory: (id) => callFunction('admin-products', { action: 'delete-category', id }),
+
+  // Справочник соцсетей (иконка на каждую, для автоподстановки в форме
+  // товара) — CRUD-набор в том же стиле, что и категории выше.
+  getNetworks: () => callFunction('admin-products', { action: 'list-networks' }),
+  createNetwork: (title, iconUrl) => callFunction('admin-products', { action: 'create-network', title, iconUrl }),
+  updateNetwork: (id, iconUrl) => callFunction('admin-products', { action: 'update-network', id, iconUrl }),
+  deleteNetwork: (id) => callFunction('admin-products', { action: 'delete-network', id }),
 
   // Ручная рассылка от бота всем пользователям — ничего не уходит
   // автоматически, только по явному нажатию в админке.

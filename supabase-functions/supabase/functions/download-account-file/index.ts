@@ -51,7 +51,8 @@ Deno.serve(async (req) => {
     .eq('user_id', result.user.id) // своя покупка и только своя
     .single();
 
-  if (error || !purchase || purchase.kind !== 'account' || !Array.isArray(purchase.credentials)) {
+  const allowedKinds = purchase?.kind === 'account' || purchase?.kind === 'one-time';
+  if (error || !purchase || !allowedKinds || !Array.isArray(purchase.credentials)) {
     return new Response('Покупка не найдена', { status: 404, headers: CORS_HEADERS });
   }
 
