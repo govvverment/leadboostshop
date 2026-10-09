@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { openSupportChat } from '../utils/support';
 import { useTheme } from '../context/ThemeContext';
 import { useLocale } from '../context/LocaleContext';
@@ -50,8 +51,18 @@ function ThemeToggle() {
 // показывались все три варианта в ряд — это "плавало": при переключении
 // активный пункт менял ширину/вес шрифта и сдвигал соседние кнопки хедера.
 // Теперь виден только текущий язык, а выбор — во всплывающей снизу шторке
-// (тот же компонент, что и везде в приложении для шторок/фильтров), так
-// хедер всегда остаётся одной и той же фиксированной ширины.
+// (тот же компонент, что и везде в приложении для шторок/фильтров).
+//
+// Шторка рендерится через портал прямо в document.body, а НЕ как обычный
+// потомок <header> — это важно. У .app-header стоит backdrop-filter
+// (блюр фона), а backdrop-filter/filter на предке создают для всех его
+// potомков с position:fixed свой собственный "контейнер" вместо
+// viewport — то есть .sheet-overlay (position:fixed; inset:0) пыталась
+// бы растянуться не на весь экран, а только на ~56px высоты самого
+// хедера, и выглядело это как "шторка открылась и тут же пропала".
+// Порталом мы физически переносим DOM-узел шторки в <body>, минуя
+// хедер и его backdrop-filter — точно так же, как ведут себя все
+// остальные шторки в приложении (они и не вложены в хедер).
 function LocaleToggle() {
   const { locale, setLocale, t } = useLocale();
   const [open, setOpen] = useState(false);
@@ -67,25 +78,27 @@ function LocaleToggle() {
         {LOCALE_LABELS[locale]}
       </button>
 
-      {open && (
-        <SheetOverlay onDismiss={() => setOpen(false)}>
-          <h2 className="sheet__title">{t('header.language')}</h2>
-          <div className="filter-sheet__list">
-            {LOCALES.map((code) => (
-              <button
-                key={code}
-                className={'filter-sheet__item' + (locale === code ? ' is-active' : '')}
-                onClick={() => {
-                  setLocale(code);
-                  setOpen(false);
-                }}
-              >
-                {LOCALE_NAMES[code]}
-              </button>
-            ))}
-          </div>
-        </SheetOverlay>
-      )}
+      {open &&
+        createPortal(
+          <SheetOverlay onDismiss={() => setOpen(false)}>
+            <h2 className="sheet__title">{t('header.language')}</h2>
+            <div className="filter-sheet__list">
+              {LOCALES.map((code) => (
+                <button
+                  key={code}
+                  className={'filter-sheet__item' + (locale === code ? ' is-active' : '')}
+                  onClick={() => {
+                    setLocale(code);
+                    setOpen(false);
+                  }}
+                >
+                  {LOCALE_NAMES[code]}
+                </button>
+              ))}
+            </div>
+          </SheetOverlay>,
+          document.body
+        )}
     </>
   );
 }
