@@ -23,9 +23,6 @@ import DepositPayment from './screens/balance/DepositPayment';
 import { DepositSuccess, DepositFailed } from './screens/balance/DepositResult';
 import BalanceHistory from './screens/balance/History';
 
-import ReferralsHome from './screens/referrals/Home';
-import ReferralsAll from './screens/referrals/All';
-
 import ProfileHome from './screens/profile/Home';
 import ProfileTerms from './screens/profile/Terms';
 
@@ -37,6 +34,9 @@ import AdminInventory from './admin/screens/AdminInventory';
 import AdminStats from './admin/screens/AdminStats';
 import AdminCategories from './admin/screens/AdminCategories';
 import AdminBroadcast from './admin/screens/AdminBroadcast';
+import AdminBalance from './admin/screens/AdminBalance';
+import AdminOrders from './admin/screens/AdminOrders';
+import AdminNetworks from './admin/screens/AdminNetworks';
 
 export default function App() {
   return (
@@ -67,9 +67,6 @@ export default function App() {
         <Route path="/balance/deposit/success" element={<DepositSuccess />} />
         <Route path="/balance/deposit/failed" element={<DepositFailed />} />
         <Route path="/balance/history" element={<BalanceHistory />} />
-
-        <Route path="/referrals" element={<ReferralsHome />} />
-        <Route path="/referrals/all" element={<ReferralsAll />} />
 
         <Route path="/profile" element={<ProfileHome />} />
         <Route path="/profile/terms" element={<ProfileTerms />} />
@@ -127,6 +124,30 @@ export default function App() {
           element={
             <AdminGuard>
               <AdminBroadcast />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/admin/balance"
+          element={
+            <AdminGuard>
+              <AdminBalance />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/admin/orders"
+          element={
+            <AdminGuard>
+              <AdminOrders />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/admin/networks"
+          element={
+            <AdminGuard>
+              <AdminNetworks />
             </AdminGuard>
           }
         />

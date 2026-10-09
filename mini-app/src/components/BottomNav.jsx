@@ -1,8 +1,7 @@
 import { NavLink } from 'react-router-dom';
 
 // Иконки сверены пиксель-в-пиксель с макетом (Bottom Navigation.png
-// из архива дизайна) — обводка везде, кроме "Рефералы", там в макете
-// иконка залитая (сплошные силуэты), не контурная.
+// из архива дизайна).
 const ICONS = {
   profile: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -28,23 +27,12 @@ const ICONS = {
       <path d="M15.5 15.8l1.6 1.6 3-3.4" strokeWidth="2.2" />
     </svg>
   ),
-  referrals: (
-    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-      <circle cx="12" cy="9.3" r="3" />
-      <ellipse cx="12" cy="18.2" rx="6" ry="3.2" />
-      <circle cx="5.3" cy="9.8" r="2" opacity="0.55" />
-      <ellipse cx="4" cy="18.6" rx="3" ry="2.6" opacity="0.55" />
-      <circle cx="18.7" cy="9.8" r="2" opacity="0.55" />
-      <ellipse cx="20" cy="18.6" rx="3" ry="2.6" opacity="0.55" />
-    </svg>
-  ),
 };
 
 const items = [
   { to: '/profile', label: 'Профиль', icon: 'profile' },
   { to: '/products', label: 'Товары', icon: 'products' },
   { to: '/purchases', label: 'Покупки', icon: 'purchases' },
-  { to: '/referrals', label: 'Рефералы', icon: 'referrals' },
 ];
 
 export default function BottomNav() {

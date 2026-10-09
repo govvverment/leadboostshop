@@ -1,18 +1,8 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Screen from '../../components/Screen';
-import ProductIcon from '../../components/ProductIcon';
 import ProductImage from '../../components/ProductImage';
 import { useApp } from '../../context/AppContext';
-
-// Две базовые категории ("Аккаунты" / "Технические решения") всегда
-// рисуем встроенной SVG-иконкой, а не загруженной через админку картинкой:
-// у них была реальная PNG-картинка с зашитым тёмным фоном — она не
-// подстраивалась под светлую тему и вдобавок каждый раз при заходе на
-// главную грузилась по сети заново (заметная задержка при первом
-// открытии). Иконка — часть бандла, рисуется мгновенно и красится
-// через var(--accent)/var(--accent-soft), как остальная иконография.
-const BUILTIN_CATEGORY_ICONS = new Set(['accounts', 'solutions']);
 
 function pluralize(n, one, few, many) {
   const mod10 = n % 10;
@@ -146,13 +136,9 @@ export default function ProductsHome() {
             return (
               <button key={c.id} className="category-card" onClick={() => navigate(`/products/${c.id}`)}>
                 <span className="category-card__icon">
-                  {BUILTIN_CATEGORY_ICONS.has(c.id) ? (
-                    <ProductIcon kind={c.id === 'accounts' ? 'account' : 'solution'} />
-                  ) : (
-                    <ProductImage
-                      product={{ imageUrl: c.imageUrl, kind: c.id === 'accounts' ? 'account' : 'solution' }}
-                    />
-                  )}
+                  <ProductImage
+                    product={{ imageUrl: c.imageUrl, kind: c.id === 'accounts' ? 'account' : 'solution' }}
+                  />
                 </span>
                 <span className="category-card__title">{c.title.split(' ').join('\n')}</span>
                 <span className="category-card__count">
