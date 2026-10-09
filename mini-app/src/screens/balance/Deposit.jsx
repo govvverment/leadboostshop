@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Screen from '../../components/Screen';
 import { useApp } from '../../context/AppContext';
+import { useLocale } from '../../context/LocaleContext';
 import { depositPresets, depositCurrency } from '../../mock/data';
 
 // BEP20 временно скрыт: бэкенд для него уже готов (deposit-create/
@@ -15,6 +16,7 @@ const NETWORKS = ['TRC20', 'ERC20'];
 export default function BalanceDeposit() {
   const navigate = useNavigate();
   const { showToast } = useApp();
+  const { t } = useLocale();
   const [amount, setAmount] = useState('');
   const [network, setNetwork] = useState(NETWORKS[0]);
 
@@ -22,7 +24,7 @@ export default function BalanceDeposit() {
 
   const handleNetworkSelect = (nextNetwork) => {
     if (nextNetwork === 'ERC20') {
-      showToast('Сеть ERC20 временно недоступна для пополнения');
+      showToast(t('deposit.toastNetworkUnavailable'));
       return;
     }
     setNetwork(nextNetwork);
@@ -30,27 +32,27 @@ export default function BalanceDeposit() {
 
   const handleContinue = () => {
     if (network === 'ERC20') {
-      showToast('Сеть ERC20 временно недоступна для пополнения');
+      showToast(t('deposit.toastNetworkUnavailable'));
       return;
     }
     navigate('/balance/deposit/payment', { state: { amount: numeric, network } });
   };
 
   return (
-    <Screen title="Пополнение баланса">
+    <Screen title={t('deposit.title')}>
       <div className="page-head">
-        <button className="page-head__back" onClick={() => navigate(-1)} aria-label="Назад">
+        <button className="page-head__back" onClick={() => navigate(-1)} aria-label={t('common.back')}>
           ‹
         </button>
-        <h1 className="page-head__title">Пополнение баланса</h1>
+        <h1 className="page-head__title">{t('deposit.title')}</h1>
       </div>
 
-      <h3 className="section__title">Сумма пополнения</h3>
+      <h3 className="section__title">{t('deposit.amountTitle')}</h3>
       <div className="amount-input">
         <span className="amount-input__prefix">$</span>
         <input
           type="number"
-          placeholder="Введите сумму"
+          placeholder={t('deposit.amountPlaceholder')}
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
@@ -68,7 +70,7 @@ export default function BalanceDeposit() {
         ))}
       </div>
 
-      <h3 className="section__title">Способ оплаты</h3>
+      <h3 className="section__title">{t('deposit.paymentMethodTitle')}</h3>
       <div className="currency-row currency-row--active">
         <svg className="currency-row__icon" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
           <circle cx="16" cy="16" r="16" fill="#26A17B" />
@@ -84,7 +86,7 @@ export default function BalanceDeposit() {
         <span className="currency-row__check">✓</span>
       </div>
 
-      <h3 className="section__title">Сеть</h3>
+      <h3 className="section__title">{t('deposit.networkTitle')}</h3>
       <div className="network-row">
         {NETWORKS.map((n) => (
           <button
@@ -102,7 +104,7 @@ export default function BalanceDeposit() {
         disabled={!numeric || numeric <= 0}
         onClick={handleContinue}
       >
-        Продолжить
+        {t('deposit.continueButton')}
       </button>
     </Screen>
   );

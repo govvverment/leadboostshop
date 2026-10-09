@@ -105,32 +105,24 @@
   transform: translateX(18px);
 }
 
-/* Переключатель языка (RU/UA/EN) — компактный сегмент-контрол рядом с
-   тумблером темы. */
+/* Переключатель языка — кнопка с кодом текущего языка, высотой и формой
+   симметричная тумблеру темы рядом (оба 26px, pill). Показывает только
+   активный язык — остальные открываются во всплывашке снизу (не "плавает":
+   ширина кнопки всегда одинаковая, не зависит от выбранного языка). */
 .locale-toggle {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  padding: 2px;
-  gap: 2px;
+  width: 36px;
+  height: 26px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-}
-.locale-toggle__item {
-  background: none;
-  border: none;
   color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  padding: 5px 7px;
-  border-radius: var(--radius-pill);
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-.locale-toggle__item.is-active {
-  background: var(--accent);
-  color: var(--accent-contrast, #fff);
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 /* На узких экранах оставляем в кнопке поддержки только иконку — вместе с

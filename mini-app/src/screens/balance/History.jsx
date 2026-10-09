@@ -5,6 +5,8 @@ import EmptyState from '../../components/EmptyState';
 import Icon from '../../components/Icon';
 import ProductImage from '../../components/ProductImage';
 import { useApp } from '../../context/AppContext';
+import { useLocale } from '../../context/LocaleContext';
+import { LOCALE_DATE_TAG } from '../../i18n/translations';
 
 const ICONS = { deposit: 'download', purchase: 'bag', subscription: 'code', referral: 'people' };
 
@@ -12,23 +14,23 @@ function isSameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function groupLabel(date) {
+function groupLabel(date, t, dateTag) {
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (isSameDay(date, now)) return 'Сегодня';
-  if (isSameDay(date, yesterday)) return 'Вчера';
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  if (isSameDay(date, now)) return t('history.today');
+  if (isSameDay(date, yesterday)) return t('history.yesterday');
+  return date.toLocaleDateString(dateTag, { day: 'numeric', month: 'long' });
 }
 
 // Плоский список от backend (отсортирован по дате) группируем по дню
 // прямо здесь — так и в моковом, и в реальном режиме используется один
 // и тот же плоский формат, группировка не зависит от источника данных.
-function groupByDay(items) {
+function groupByDay(items, t, dateTag) {
   const groups = [];
   const byLabel = new Map();
   for (const item of items) {
-    const label = groupLabel(new Date(item.date));
+    const label = groupLabel(new Date(item.date), t, dateTag);
     if (!byLabel.has(label)) {
       const group = { group: label, items: [] };
       byLabel.set(label, group);
@@ -42,6 +44,7 @@ function groupByDay(items) {
 export default function BalanceHistory() {
   const navigate = useNavigate();
   const { balanceHistory } = useApp();
+  const { t, locale } = useLocale();
   const [filter, setFilter] = useState('all');
 
   const filterEntry = (item) => {
@@ -50,24 +53,24 @@ export default function BalanceHistory() {
     return item.type !== 'deposit';
   };
 
-  const groups = groupByDay(balanceHistory)
+  const groups = groupByDay(balanceHistory, t, LOCALE_DATE_TAG[locale])
     .map((g) => ({ ...g, items: g.items.filter(filterEntry) }))
     .filter((g) => g.items.length > 0);
 
   return (
-    <Screen title="История баланса">
+    <Screen title={t('history.title')}>
       <div className="page-head">
-        <button className="page-head__back" onClick={() => navigate(-1)} aria-label="Назад">
+        <button className="page-head__back" onClick={() => navigate(-1)} aria-label={t('common.back')}>
           ‹
         </button>
-        <h1 className="page-head__title">История баланса</h1>
+        <h1 className="page-head__title">{t('history.title')}</h1>
       </div>
 
       <div className="filter-row">
         {[
-          ['all', 'Все'],
-          ['deposit', 'Пополнение'],
-          ['purchase', 'Покупки'],
+          ['all', t('history.filterAll')],
+          ['deposit', t('history.filterDeposit')],
+          ['purchase', t('history.filterPurchase')],
         ].map(([id, label]) => (
           <button key={id} className={'filter-chip' + (filter === id ? ' is-active' : '')} onClick={() => setFilter(id)}>
             {label}
@@ -76,7 +79,7 @@ export default function BalanceHistory() {
       </div>
 
       {groups.length === 0 ? (
-        <EmptyState icon="⬚" title="История пуста" subtitle="Здесь будут ваши пополнения и списания" />
+        <EmptyState icon="⬚" title={t('history.emptyTitle')} subtitle={t('history.emptySubtitle')} />
       ) : (
         groups.map((g) => (
           <div className="history-group" key={g.group}>

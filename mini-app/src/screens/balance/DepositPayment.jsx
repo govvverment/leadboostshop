@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import Screen from '../../components/Screen';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
+import { useLocale } from '../../context/LocaleContext';
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -11,6 +12,7 @@ export default function DepositPayment() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const { createDepositRequest, checkDepositRequest, showToast } = useApp();
+  const { t } = useLocale();
 
   const amount = state?.amount ?? 50;
   const network = state?.network ?? 'TRC20';
@@ -80,7 +82,7 @@ export default function DepositPayment() {
         if (resolvedRef.current || stopped) return;
         if (result.status === 'confirmed') {
           resolvedRef.current = true;
-          showToast('Баланс пополнен');
+          showToast(t('depositPayment.toastBalanceTopped'));
           navigate('/balance/deposit/success', { replace: true, state: { amount: result.amount ?? amount, network } });
         } else if (result.status === 'expired') {
           resolvedRef.current = true;
@@ -110,7 +112,7 @@ export default function DepositPayment() {
 
   const copyText = (value) => {
     navigator.clipboard?.writeText(String(value)).catch(() => {});
-    showToast('Скопировано');
+    showToast(t('common.copied'));
   };
 
   const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
@@ -118,55 +120,54 @@ export default function DepositPayment() {
   const uniqueAmountText = request ? Number(request.uniqueAmount).toFixed(4) : '';
 
   return (
-    <Screen title="Оплата" withNav={false}>
+    <Screen title={t('depositPayment.title')} withNav={false}>
       <div className="page-head">
-        <button className="page-head__back" onClick={() => navigate(-1)} aria-label="Назад">
+        <button className="page-head__back" onClick={() => navigate(-1)} aria-label={t('common.back')}>
           ‹
         </button>
-        <h1 className="page-head__title">Оплата</h1>
+        <h1 className="page-head__title">{t('depositPayment.title')}</h1>
       </div>
 
       {error && <p className="confirm-sheet__warning">{error}</p>}
 
       {!request && !error ? (
-        <p className="hint-text">Создаём заявку на оплату...</p>
+        <p className="hint-text">{t('depositPayment.creatingRequest')}</p>
       ) : request ? (
         <>
           <div className="pay-summary">
-            <span className="pay-summary__label">Отправьте ровно</span>
+            <span className="pay-summary__label">{t('depositPayment.sendExactly')}</span>
             <span className="pay-summary__amount">{uniqueAmountText} USDT</span>
             <span className="badge badge--accent">{network}</span>
           </div>
 
           <p className="hint-text" style={{ textAlign: 'center', margin: '0 0 14px' }}>
-            Важно отправить именно эту сумму, до последней цифры — по ней система узнаёт, что
-            платёж ваш.
+            {t('depositPayment.importantNote')}
           </p>
 
           <div className="qr-card">
             {qrDataUrl ? (
-              <img src={qrDataUrl} alt="QR-код адреса кошелька" className="qr-card__code" />
+              <img src={qrDataUrl} alt="" className="qr-card__code" />
             ) : (
               <div className="qr-card__code" aria-hidden="true" />
             )}
-            <p className="qr-card__hint">Адрес кошелька ({network})</p>
+            <p className="qr-card__hint">{t('depositPayment.walletAddressHint', { network })}</p>
             <div className="address-row">
               <span className="mono" style={{ wordBreak: 'break-all', fontSize: 13 }}>
                 {request.walletAddress}
               </span>
-              <button className="address-row__copy" onClick={() => copyText(request.walletAddress)} aria-label="Копировать адрес">
+              <button className="address-row__copy" onClick={() => copyText(request.walletAddress)} aria-label={t('depositPayment.copyAddressAria')}>
                 <Icon name="copy" size={16} />
               </button>
             </div>
           </div>
 
           <button className="btn btn--ghost btn--block" onClick={() => copyText(uniqueAmountText)}>
-            Скопировать сумму {uniqueAmountText}
+            {t('depositPayment.copyAmountButton', { amount: uniqueAmountText })}
           </button>
 
           <div className="waiting-row">
             <span className="waiting-row__icon">◷</span>
-            <span>Ожидаем оплату</span>
+            <span>{t('depositPayment.waitingPayment')}</span>
             <span className="waiting-row__timer">
               {mm}:{ss}
             </span>

@@ -5,6 +5,7 @@ import Icon from '../../components/Icon';
 import ProductIcon from '../../components/ProductIcon';
 import ProductImage from '../../components/ProductImage';
 import { useApp } from '../../context/AppContext';
+import { useLocale } from '../../context/LocaleContext';
 
 function RowIcon({ productId, kind, getProduct }) {
   const product = getProduct(productId);
@@ -14,6 +15,7 @@ function RowIcon({ productId, kind, getProduct }) {
 export default function PurchasesHome() {
   const navigate = useNavigate();
   const { purchases, subscriptions, getProduct } = useApp();
+  const { t } = useLocale();
 
   const combined = [
     ...purchases.map((p) => ({ ...p, entryType: 'purchase' })),
@@ -21,14 +23,14 @@ export default function PurchasesHome() {
   ];
 
   return (
-    <Screen title="Покупки">
-      <h1 className="page-title">Покупки</h1>
-      <p className="page-subtitle">Ваши товары и активные подписки</p>
+    <Screen title={t('purchasesList.title')}>
+      <h1 className="page-title">{t('purchasesList.title')}</h1>
+      <p className="page-subtitle">{t('purchasesList.subtitle')}</p>
 
       <div className="tab-row">
-        <button className="tab is-active">Все покупки</button>
+        <button className="tab is-active">{t('purchasesList.tabAll')}</button>
         <button className="tab" onClick={() => navigate('/purchases/subscriptions')}>
-          Подписки
+          {t('purchasesList.tabSubscriptions')}
         </button>
       </div>
 
@@ -36,11 +38,11 @@ export default function PurchasesHome() {
         <EmptyState
           icon={<Icon name="packageBookmark" size={24} />}
           square
-          title="Покупок пока нет"
-          subtitle="Здесь появятся купленные товары и активные подписки"
+          title={t('purchasesList.emptyTitle')}
+          subtitle={t('purchasesList.emptySubtitle')}
           action={
             <button className="btn btn--primary" onClick={() => navigate('/products')}>
-              Перейти к товарам
+              {t('purchasesList.goToProducts')}
             </button>
           }
         />
@@ -55,7 +57,7 @@ export default function PurchasesHome() {
                     <span className="list-row__title">{entry.title}</span>
                     <span className="list-row__meta">
                       {(entry.kind === 'account'
-                        ? [entry.geo, entry.type, entry.qty ? `${entry.qty} шт.` : null]
+                        ? [entry.geo, entry.type, entry.qty ? `${entry.qty} ${t('purchasesList.pieces')}` : null]
                         : [entry.type]
                       )
                         .filter(Boolean)
@@ -69,7 +71,7 @@ export default function PurchasesHome() {
                   <span className="list-row__date">
                     {entry.date} · {entry.time}
                   </span>
-                  <span className="list-row__status list-row__status--success">Оплачено</span>
+                  <span className="list-row__status list-row__status--success">{t('purchasesList.paid')}</span>
                 </div>
               </button>
             ) : (
@@ -91,10 +93,12 @@ export default function PurchasesHome() {
                 </div>
                 <div className="list-row__bottom">
                   <span className="list-row__date">
-                    {entry.status === 'active' ? `Активная до ${entry.activeUntil}` : `Завершилась ${entry.endedAt}`}
+                    {entry.status === 'active'
+                      ? t('purchasesList.activeUntil', { date: entry.activeUntil })
+                      : t('purchasesList.endedAt', { date: entry.endedAt })}
                   </span>
                   <span className={'list-row__status' + (entry.status === 'active' ? ' list-row__status--success' : ' list-row__status--danger')}>
-                    {entry.status === 'active' ? 'Активная' : 'Неактивная'}
+                    {entry.status === 'active' ? t('purchasesList.active') : t('purchasesList.inactive')}
                   </span>
                 </div>
               </button>

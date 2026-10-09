@@ -3,6 +3,7 @@ import Screen from '../../components/Screen';
 import Icon from '../../components/Icon';
 import { user as mockUser } from '../../mock/data';
 import { useApp } from '../../context/AppContext';
+import { useLocale } from '../../context/LocaleContext';
 import { useTelegramUser } from '../../hooks/useTelegramUser';
 import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { openSupportChat } from '../../utils/support';
@@ -11,6 +12,7 @@ import { trackEvent } from '../../supabase/api';
 export default function ProfileHome() {
   const navigate = useNavigate();
   const { balance } = useApp();
+  const { t } = useLocale();
   const tgUser = useTelegramUser();
   const isAdmin = useIsAdmin();
 
@@ -22,14 +24,14 @@ export default function ProfileHome() {
   const photoUrl = tgUser?.photoUrl;
 
   const menu = [
-    { icon: 'history', label: 'История баланса', to: '/balance/history' },
-    { icon: 'headset', label: 'Поддержка', onClick: openSupportChat },
-    { icon: 'document', label: 'Условия и политика', to: '/profile/terms' },
+    { icon: 'history', label: t('profile.menuHistory'), to: '/balance/history' },
+    { icon: 'headset', label: t('profile.menuSupport'), onClick: openSupportChat },
+    { icon: 'document', label: t('profile.menuTerms'), to: '/profile/terms' },
   ];
 
   return (
-    <Screen title="Профиль">
-      <h1 className="page-title">Профиль</h1>
+    <Screen title={t('profile.title')}>
+      <h1 className="page-title">{t('profile.title')}</h1>
 
       <div className="profile-card">
         {photoUrl ? (
@@ -45,7 +47,7 @@ export default function ProfileHome() {
       </div>
 
       <div className="balance-card">
-        <span className="balance-card__label">Баланс</span>
+        <span className="balance-card__label">{t('profile.balance')}</span>
         <span className="balance-card__amount">${balance.toFixed(2)}</span>
         <button
           className="btn btn--primary btn--block"
@@ -54,7 +56,7 @@ export default function ProfileHome() {
             navigate('/balance/deposit');
           }}
         >
-          + Пополнить баланс
+          {t('profile.topUp')}
         </button>
       </div>
 
@@ -77,7 +79,7 @@ export default function ProfileHome() {
             <span className="menu-row__icon">
               <Icon name="gear" size={18} />
             </span>
-            <span className="menu-row__label">Админ-панель</span>
+            <span className="menu-row__label">{t('profile.menuAdmin')}</span>
             <span className="menu-row__chevron">›</span>
           </button>
         )}

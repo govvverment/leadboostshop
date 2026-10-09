@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { openSupportChat } from '../utils/support';
 import { useTheme } from '../context/ThemeContext';
 import { useLocale } from '../context/LocaleContext';
-import { LOCALES, LOCALE_LABELS } from '../i18n/translations';
+import { LOCALES, LOCALE_LABELS, LOCALE_NAMES } from '../i18n/translations';
+import SheetOverlay from './SheetOverlay';
 import logo from '../assets/logo.png';
 
 // logo импортируется как модуль (а не лежит в public/ и не грузится
@@ -43,25 +45,48 @@ function ThemeToggle() {
   );
 }
 
-// Переключатель языка — компактный 3-позиционный тумблер (RU / UA / EN),
-// рядом с переключателем темы. Выбор запоминается в localStorage
-// (см. LocaleContext), по умолчанию — русский.
+// Переключатель языка — компактная кнопка с кодом текущего языка (RU/UA/EN),
+// по размеру и форме симметричная тумблеру темы рядом. Раньше тут сразу
+// показывались все три варианта в ряд — это "плавало": при переключении
+// активный пункт менял ширину/вес шрифта и сдвигал соседние кнопки хедера.
+// Теперь виден только текущий язык, а выбор — во всплывающей снизу шторке
+// (тот же компонент, что и везде в приложении для шторок/фильтров), так
+// хедер всегда остаётся одной и той же фиксированной ширины.
 function LocaleToggle() {
   const { locale, setLocale, t } = useLocale();
+  const [open, setOpen] = useState(false);
+
   return (
-    <div className="locale-toggle" role="group" aria-label={t('header.language')}>
-      {LOCALES.map((code) => (
-        <button
-          key={code}
-          type="button"
-          className={'locale-toggle__item' + (locale === code ? ' is-active' : '')}
-          aria-pressed={locale === code}
-          onClick={() => setLocale(code)}
-        >
-          {LOCALE_LABELS[code]}
-        </button>
-      ))}
-    </div>
+    <>
+      <button
+        type="button"
+        className="locale-toggle"
+        aria-label={t('header.language')}
+        onClick={() => setOpen(true)}
+      >
+        {LOCALE_LABELS[locale]}
+      </button>
+
+      {open && (
+        <SheetOverlay onDismiss={() => setOpen(false)}>
+          <h2 className="sheet__title">{t('header.language')}</h2>
+          <div className="filter-sheet__list">
+            {LOCALES.map((code) => (
+              <button
+                key={code}
+                className={'filter-sheet__item' + (locale === code ? ' is-active' : '')}
+                onClick={() => {
+                  setLocale(code);
+                  setOpen(false);
+                }}
+              >
+                {LOCALE_NAMES[code]}
+              </button>
+            ))}
+          </div>
+        </SheetOverlay>
+      )}
+    </>
   );
 }
 

@@ -5,32 +5,34 @@ import Icon from '../../components/Icon';
 import ProductIcon from '../../components/ProductIcon';
 import ProductImage from '../../components/ProductImage';
 import { useApp } from '../../context/AppContext';
+import { useLocale } from '../../context/LocaleContext';
 
 export default function PurchasesSubscriptions() {
   const navigate = useNavigate();
   const { subscriptions, getProduct } = useApp();
+  const { t } = useLocale();
 
   return (
-    <Screen title="Покупки">
-      <h1 className="page-title">Покупки</h1>
-      <p className="page-subtitle">Ваши товары и активные подписки</p>
+    <Screen title={t('purchasesList.title')}>
+      <h1 className="page-title">{t('purchasesList.title')}</h1>
+      <p className="page-subtitle">{t('purchasesList.subtitle')}</p>
 
       <div className="tab-row">
         <button className="tab" onClick={() => navigate('/purchases')}>
-          Все покупки
+          {t('purchasesList.tabAll')}
         </button>
-        <button className="tab is-active">Подписки</button>
+        <button className="tab is-active">{t('purchasesList.tabSubscriptions')}</button>
       </div>
 
       {subscriptions.length === 0 ? (
         <EmptyState
           icon={<Icon name="packageBookmark" size={24} />}
           square
-          title="Активных подписок пока нет"
-          subtitle="Здесь появятся ваши активные подписки"
+          title={t('purchasesList.emptySubsTitle')}
+          subtitle={t('purchasesList.emptySubsSubtitle')}
           action={
             <button className="btn btn--primary" onClick={() => navigate('/products/solutions')}>
-              Перейти к решениям
+              {t('purchasesList.goToSolutions')}
             </button>
           }
         />
@@ -53,10 +55,12 @@ export default function PurchasesSubscriptions() {
               </div>
               <div className="list-row__bottom">
                 <span className="list-row__date">
-                  {s.status === 'active' ? `Активная до ${s.activeUntil}` : `Завершилась ${s.endedAt}`}
+                  {s.status === 'active'
+                    ? t('purchasesList.activeUntil', { date: s.activeUntil })
+                    : t('purchasesList.endedAt', { date: s.endedAt })}
                 </span>
                 <span className={'list-row__status' + (s.status === 'active' ? ' list-row__status--success' : ' list-row__status--danger')}>
-                  {s.status === 'active' ? 'Активная' : 'Неактивная'}
+                  {s.status === 'active' ? t('purchasesList.active') : t('purchasesList.inactive')}
                 </span>
               </div>
             </button>
